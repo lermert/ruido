@@ -189,7 +189,7 @@ class CCData(object):
         if rank != 0:
             raise ValueError("Call this function only on one process.Sorry!")
 
-        t_to_select = self.data.timestamps
+        t_to_select = self.timestamps
 
         # find closest to t0 window
         assert type(t0) in [float, np.float64], "t0 must be floating point time stamp"
@@ -367,7 +367,7 @@ class CCData(object):
         if not np.ndim(to_window) == 2:
             raise ValueError("Input array for windowing must have dimensions of n_traces * n_samples")
 
-        win = get_window(t_mid, hw, lag, window_type=window_type, alpha=tukey_alpha)
+        win = filter.get_window(t_mid, hw, lag, window_type=window_type, alpha=tukey_alpha)
 
         if not cutout:
             for ix in range(to_window.shape[0]):
@@ -520,9 +520,9 @@ run measure_dvv_ser on one process.")
         comm.Gather(best_ccoeff, best_ccoeff_all[: ndata - nrest], root=0)
 
         if rank == 0:
-            print(dvv_all.shape)
-            print(ndata)
-            print(nrest)
+            #print(dvv_all.shape)
+            #print(ndata)
+            #print(nrest)
             if nrest > 0:
                 to_measure_extra = self.data[ndata - nrest:]
                 timestamps_extra = self.timestamps[ndata - nrest:]
@@ -634,22 +634,6 @@ run measure_dvv_ser on one process.")
             cnt += 1
         return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
 
-    def get_window(self, t_mid, hw, lag, window_type, alpha=0.2):
-
-        if rank != 0:
-            raise ValueError("Call this function only on one process")
-        # half_lag_minus_one = int((self.npts - 1) / 2)
-        ix_1 = np.argmin(abs(lag - t_mid - hw))
-        ix_0 = np.argmin(abs(lag - t_mid + hw))  # [self.lag > 0]
-        win = np.zeros(lag.shape)
-        if window_type == "hann":
-            # win[half_lag_minus_one + ix_0 : half_lag_minus_one + ix_1] = hann(ix_1 - ix_0)
-            win[ix_0: ix_1] = hann(ix_1 - ix_0)
-        elif window_type == "tukey":
-            win[ix_0: ix_1] = tukey(ix_1 - ix_0, alpha=alpha)
-        elif window_type == "boxcar":
-            win[ix_0: ix_1] = 1.0
-        return(win)
 
     def post_whiten(self, f1, f2, npts_smooth=5, freq_norm="rma"):
 
@@ -661,7 +645,7 @@ run measure_dvv_ser on one process.")
             nrest = ndata % size
             to_filter = self.data[0: ndata - nrest]
             npts = self.npts
-            print(npts)
+            # print(npts)
             fs = self.fs
             freq = np.fft.fftfreq(n=nfft,
                                   d=1./self.fs)

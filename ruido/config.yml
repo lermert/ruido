@@ -1,0 +1,109 @@
+###################################################
+## CONFIGURATION FILE FOR RUIDO                  ##
+## copy this file to working dir. and edit       ##
+## pass the path to the edited file as argument  ##
+## to run.py                                     ##
+###################################################
+
+# =================================================
+# GENERAL CONFIGURATION
+# =================================================
+# Path to h5 files (e.g. from ants_2)
+input_directory: tests/testdata/
+# frequency bands: These will be used throughout
+# clustering, stacking and measurement.
+freq_bands:
+-   - 0.25
+    - 0.5
+-   - 0.5
+    - 1.0
+# filter type: "bandpass" (butterworth)
+# or "cheby2_bandpass"
+# filtering will be applied for clustering
+# and also before stacking
+filt_type: "bandpass"
+# max. order
+# only relevant for cheby2_bandpass filter
+filt_maxord: 18 
+# directory where to save clusters
+cluster_dir: output/clusters/
+# directory where to save stacks
+stack_dir: output/stacks
+# directory where to save measurements
+msr_dir: output/measurements
+# plot or not
+do_plots: true
+
+
+# =================================================
+# CLUSTERING CONFIGURATION
+# =================================================
+do_clustering: true
+do_window: true
+# center of window in terms of lag, seconds
+twin_mid: 0.0
+# halfwidth in terms of longest period
+hw_factor: 10
+# desired level of explaining variance by PCA
+expl_var: 0.95
+# nr. of random samples to be pulled from each file
+# e.g.: If there are 5 files for station G.UNM..HHZ
+# then this will randomly select n_samples_each_file
+# from each of them.
+# if you want to use all available, set to "all"
+# int or "all"
+n_samples_each_file: 1000
+# n clusters to try out. 
+# the final number will be based on estimating 
+# the "knee" of the Bayesian information criterion 
+# (as implemented by Viens & Iwata)
+nclust: 
+-   - 1
+    - 12
+
+# =================================================
+# STACKING CONFIGURATION
+# =================================================
+
+
+# =================================================
+# MEASUREMENT CONFIGURATION
+# =================================================
+# measurement type: "stretching"
+measurement_type: stretching
+# reference type: "bootstrap" or "list" or "increment"
+reference_type: list
+# reference_length_days: only relevant for bootstrap
+reference_length_days: 365
+# how many samples for bootstrapping
+# (will be ignored for all other reference_type)
+bootstrap_samples: 50
+# specified reference windows: only relevant for "list"
+# specify a minimum of one pair (start end) in the format YYYY,jjj
+reference_list:
+-   - 1995,001
+    - 1996,001
+-   - 2000,001
+    - 2001,001
+# new_fs: if it is larger than current sampling rate of data,
+# then the data will be interpolated
+new_fs: 160.0
+# window type to select lag window: boxcar or tukey or hann
+window_type: boxcar
+# ngrid for stretching measurement
+ngrid: 50
+# allow this many times more stretching than permitted normally
+# note: any value larger than 1 can lead to cycle skipping.
+# However, not permitting larger values can lead to saturating 
+# dv/v if strong long-term change
+skipfactor: 1
+# "bad times": times that should be replaced by 0 velocity change
+# due to data quality issues.
+# only for reference_type = "brenguier"
+skiptimes_inversion:
+-   - 1998,180
+    - 2000,001
+-   - 2001,090
+    - 2002,350
+# seconds to plot in each frequency band (starting from 0)
+plotting: false
