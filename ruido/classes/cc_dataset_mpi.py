@@ -950,7 +950,7 @@ run measure_dvv_ser on one process.")
 
         if plot_mode == "heatmap":
             # center on lags
-            lag -= 0.5 * 1. / self.dataset[stacklevel].fs
+            lag += 1. / self.dataset[stacklevel].fs
 
         if to_plot.shape[0] == 0:
             return()

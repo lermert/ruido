@@ -185,11 +185,16 @@ def run_stacking(config, rank, size, comm):
                                 cwin = outfile.create_group("corr_windows")
                                 stats = outfile.create_dataset("stats", data=())
                                 stats.attrs["sampling_rate"] = dset.dataset[stacklevel].fs
+                                stats.attrs["f0_Hz"] = freq_band[0]
+                                stats.attrs["f1_Hz"] = freq_band[1]
                                 for k, v in config.items():
                                     # this will save the configuration in the output file.
                                     # it also saves the configuration for measurements which is not really relevant
                                     # but whatever
-                                    if k in ["r_windows", "skiptimes_inversion", "freq_bands"]:
+                                    if k in ["freq_bands"]:
+                                        # no need to record -- have recorded already
+                                        continue
+                                    elif k in ["r_windows", "skiptimes_inversion", "freq_bands"]:
                                         ll = [[vvv for vvv in vv] for vv in v]
                                         outstr = len(ll)*"{},"
                                         stats.attrs[k] = outstr.format(*ll)

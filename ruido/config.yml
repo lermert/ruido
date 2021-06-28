@@ -164,5 +164,3 @@ skiptimes_inversion:
     - 2000,001
 -   - 2001,090
     - 2002,350
-# seconds to plot in each frequency band (starting from 0)
-plotting: false
