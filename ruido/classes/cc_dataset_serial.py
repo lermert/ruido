@@ -16,16 +16,11 @@ from obspy.signal.detrend import polynomial as obspolynomial
 from mpi4py import MPI
 from warnings import warn
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-
-
 """
 Module for handling auto- or cross-correlation datasets as output by ants_2 python code.
 """
     
-class CCData(object):
+class CCData_serial(object):
     """
     An object that holds an array of timestamps, an array of correlation data,
     and the sampling rate. In addition it holds some helpful derived
@@ -50,14 +45,7 @@ class CCData(object):
     consistent time stamps
     align(self, t1, t2, ref, plot=False): Shift traces to maximize the correlation coefficient
     of samples between lags t1 and t2, with respect to reference ref
-    data_to_envelope: Replace correlation time series by their envelopes
-    select_by_percentile: select windows by their RMS amplitude percentile
-    group_for_stacking: select all windows within a time window
-    select_for_stacking: select windows that match criteria
-    demean: Remove the mean from each correlation trace
-    detrend: Remove any linear trend from each correlation trace (usually unnecessary)
-    window_data: taper selected window (hann, tukey, boxcar). Optionally remove all samples
-    that are 0 after tapering.
+
     """
 
     def __init__(self, data, timestamps, fs):
@@ -109,6 +97,7 @@ class CCData(object):
         for i, dat in enumerate(self.data):
             rms[i] = np.sqrt(((dat - dat.mean()) ** 2).mean())
             if np.isnan(rms[i]):
+                print(rms[i], i, dat.mean())
                 rms[i] = 1.0e4  # make the value large so that these windows get discarded
         self.rms = rms
 
@@ -156,8 +145,6 @@ class CCData(object):
 
     def data_to_envelope(self):
         #replace stacks by their envelope
-        if rank != 0:
-            raise ValueError("Call this function only on one process. Sorry!")
         newstacks = []
         for s in self.data:
             newstacks.append(envelope(s))
@@ -167,11 +154,9 @@ class CCData(object):
                              mode="upper", debug_mode=False):
         # select on the basis of relative root mean square amplitude
         # of the cross-correlations
-        if rank != 0:
-            raise ValueError("Call this function only on one process. Sorry!")
-        if self.rms is None:
-            self.add_rms()
-        rms = self.rms[ixs]
+        if self.data.rms is None:
+            self.data.add_rms()
+        rms = self.data.rms[ixs]
         if mode == "upper":
             ixs_keep = np.where(rms <= np.nanpercentile(rms, perc))
         elif mode == "lower":
@@ -193,8 +178,6 @@ class CCData(object):
         Alternatively, group stacks together for forming longer stacks
         e.g. after clustering
         """
-        if rank != 0:
-            raise ValueError("Call this function only on one process.Sorry!")
 
         t_to_select = self.timestamps
 
@@ -220,9 +203,6 @@ class CCData(object):
         Select by: closeness to reference or percentile or...
         Right now this only applies to raw correlations, not to stacks
         """
-        if rank != 0:
-            raise ValueError("Call this function only on one process.Sorry!")
-
         lag = self.lag
         data = self.data
 
@@ -269,26 +249,57 @@ class CCData(object):
         return(ixs_selected)
 
     def demean(self):
-        if rank != 0:
-            raise ValueError("Call this function only on one process")
         to_demean = self.data
 
         for d in to_demean:
             d -= d.mean()
 
     def detrend(self, order=3):
-        if rank != 0:
-            raise ValueError("Call this function only on one process")
         to_detrend = self.data
         for d in to_detrend:
             obspolynomial(d, order=order)
 
+    def filter_data(self, taper_perc=0.1, filter_type="bandpass",
+                    f_hp=None, f_lp=None, corners=4, zerophase=True,
+                    maxorder=8, npool=1):
 
+        """
+        Parallel filtering using scipy second order section filter
+        """
+
+        to_filter = self.data
+        npts = self.npts
+        fs = self.fs
+        
+        # define taper to avoid high-freq. artefacts
+        taper = cosine_taper(npts, taper_perc)
+
+        # define filter
+        if filter_type == 'bandpass':
+            if None in [f_hp, f_lp]:
+                raise TypeError("f_hp and f_lp (highpass and lowpass frequency) must be floats.")
+            sos = filter.bandpass(df=fs, freqmin=f_hp, freqmax=f_lp,
+                                  corners=corners)
+        elif filter_type == 'lowpass':
+            sos = filter.lowpass(df=fs, freq=f_lp, corners=corners)
+        elif filter_type == 'highpass':
+            sos = filter.highpass(df=fs, freq=f_hp, corners=corners)
+        elif filter_type == "cheby2_bandpass":
+            sos = filter.cheby2_bandpass(df=fs, freq0=f_hp, freq1=f_lp,
+                                         maxorder=maxorder)
+        else:
+            msg = 'Filter %s is not implemented, implemented filters:\
+            bandpass, highpass, lowpass, cheby2_bandpass' % type
+            raise ValueError(msg)
+
+        for i, tr in enumerate(to_filter):
+            if zerophase:
+                to_filter[i, :] = sosfiltfilt(sos, taper * tr, padtype="even")
+            else:
+                to_filter[i, :] = sosfilt(sos, taper * tr)
 
     def window_data(self, t_mid, hw, window_type="tukey",
                     tukey_alpha=0.2, cutout=False):
-        if rank != 0:
-            raise ValueError("Call this function only on one process.Sorry")
         # check that the input array has 2 dimensions
         to_window = self.data
         lag = self.lag
@@ -309,234 +320,6 @@ class CCData(object):
             self.lag = newlag
             self.data = np.array(new_win_dat)
             self.npts = len(ix_to_keep)
-
-    def interpolate_stacks(self, new_fs):
-        """
-        Cubic interpolation to new sampling rate
-        More fancy interpolations (like Lanczos) are a bit too expensive 
-        """
-        if rank != 0:
-            raise ValueError("Call this function only on one process.Sorry!")
-        if (new_fs % self.fs) != 0:
-            raise ValueError("Only integer-factor resampling is permitted.")
-
-        stacks = self.data
-        new_npts = int((self.npts - 1.) / self.fs * new_fs) + 1
-        new_lag = np.linspace(-self.max_lag, self.max_lag, new_npts)
-
-        newstacks = []
-        for stack in stacks:
-            f = interp1d(self.lag, stack, kind="cubic")
-            newstacks.append(f(new_lag))
-        self.data = np.array(newstacks)
-        self.lag = new_lag
-        self.npts = new_npts
-        self.fs = 1. / (new_lag[1] - new_lag[0])
-
-
-class CCDataset(object):
-    """
-    An object that holds a dictionary of CCData objects and can perform all sorts
-    of stuff on them. For all operations like 
-    ...
-
-    Attributes
-    ----------
-    :type inputfile:  string
-    :param inpytfile: File path to hdf5 file produced by ants_2 python code
-    :type ref: numpy.ndarray or None
-    :param ref: reference trace (can be passed later)
-    
-
-    Methods
-    -------
-    add_datafile(self, inputfile)
-    __str__(self)
-    data_to_memory(self,ix_corr_max=None, ix_corr_min=None, keep_duration=0,
-    normalize=False)
-    stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1, overwrite=False,
-              epsilon_robuststack=None)
-    """
-
-    def __init__(self, inputfile):
-        """
-        :type inputfile: string
-        :param inputfile: File path to hdf5 file
-        :type ref: numpy.ndarray or None
-        :param ref: reference trace, e.g. from another file
-
-        """
-
-        self.station_pair = os.path.splitext(os.path.basename(inputfile))[0]
-        self.station_pair = os.path.splitext(self.station_pair)[0]
-        self.station_pair = os.path.splitext(self.station_pair)[0]
-        self.datafile = h5py.File(inputfile, 'r')
-        self.dataset = {}
-
-    def add_datafile(self, inputfile):
-
-        self.datafile.close()
-        self.station_pair = os.path.splitext(os.path.basename(inputfile))[0]
-        self.station_pair = os.path.splitext(self.station_pair)[0]
-        self.station_pair = os.path.splitext(self.station_pair)[0]
-        self.datafile = h5py.File(inputfile, 'r')
-
-    def __str__(self):
-        if rank != 0:
-            return(".")
-
-        output = ""
-        output += "Cross-correlation dataset: {}\n".format(self.station_pair)
-        for (k, v) in self.dataset.items():
-            output += "Contains {} traces on stacking level {}\n".format(v.ntraces, k)
-            output += "Starting {}, ending {}\n".format(UTCDateTime(v.timestamps[0]).strftime("%d.%m.%Y"),
-                                                        UTCDateTime(v.timestamps[-1]).strftime("%d.%m.%Y"))
-        return(output)
-
-
-    def data_to_memory(self, ix_corr_max=None, ix_corr_min=None, keep_duration=0,
-                       normalize=False):
-
-        """
-        Read data into memory and store in dataset[0]
-        :type ix_corr_max: int
-        :param ix_corr_max: correlation traces will be read up unto the preceding index
-        :type ix_corr_min: int
-        :param ix_corr_min: correlation traces will be read starting at this index
-        :type keep_duration: int
-        :param keep duration: nr. of correlation traces to keep in dataset counting from the
-        end of the array (i.e. later in time).
-        The preceding traces will be discarded from memory.
-        :type normalize: Boolean
-        :param normalize: normalize each trace by its maximum or not
-        """
-        fs = dict(self.datafile['stats'].attrs)['sampling_rate']
-        npts = self.datafile['corr_windows']["data"][0].shape[0]
-        ntraces = len(np.where(self.datafile["corr_windows"]["timestamps"])[0])
-
-        if ix_corr_max is None:
-            ix_corr_max = ntraces
-        if ix_corr_min is None:
-            ix_corr_min = 0
-
-        n_to_read = ix_corr_max - ix_corr_min
-
-        nshare = n_to_read // size
-        rest = n_to_read % size
-
-        # allocate data
-        if rank == 0:
-            try:
-                alldata = np.zeros((n_to_read, npts))
-                alldatashare = np.zeros((n_to_read - rest, npts))
-                alltimestamps = np.zeros(n_to_read)
-                alltimestampsshare = np.zeros(n_to_read - rest)
-            except MemoryError:
-                raise MemoryError("Data doesn't fit in memory, set a lower ix_corr_max")
-        else:
-            alldata = None
-            alldatashare = None
-            alltimestampsshare = None
-
-        partdata = np.zeros((nshare, npts))
-        partdata[:, :] = self.datafile["corr_windows"]["data"][rank * nshare + ix_corr_min: 
-                                                               rank * nshare + ix_corr_min + nshare, :]
-
-        # allocate timestamps array
-        timestamps = np.zeros(nshare)
-
-        for i in range(nshare):
-            tstamp = self.datafile["corr_windows"]["timestamps"][rank * nshare + ix_corr_min + i]
-            try:
-                tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
-            except IndexError:
-                pass
-            timestamps[i] = UTCDateTime(tstmp).timestamp
-
-        # gather
-        comm.Gather(partdata, alldatashare, root=0)
-        comm.Gather(timestamps, alltimestampsshare, root=0)
-
-        if rank == 0:
-            alltimestamps[0: ix_corr_max - rest] = alltimestampsshare
-            alldata[0: ix_corr_max - rest] = alldatashare
-            # get the rest!
-            for ixdata in range(ix_corr_max - rest, ix_corr_max):
-                alldata[ixdata] = self.datafile["corr_windows"]["data"][ixdata]
-                tstamp = self.datafile["corr_windows"]["timestamps"][ixdata]
-                tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
-                alltimestamps[ixdata] = UTCDateTime(tstmp).timestamp
-            print("Read to memory from {} to {}".format(UTCDateTime(alltimestamps[0]),
-                                                        UTCDateTime(alltimestamps[-1])))
-            # remove windows where there are no data
-            ixs_nonzero = np.where(alltimestamps > 0.0)[0]
-            alldata = alldata[ixs_nonzero, :]
-            alltimestamps = alltimestamps[ixs_nonzero]
-
-            try:
-                if keep_duration != 0:
-                    if keep_duration > 0:
-                        ixcut = np.argmin(((self.dataset[0].timestamps[-1] -
-                                            self.dataset[0].timestamps) -
-                                            keep_duration) ** 2)
-
-                    else:  # keep all if negative keep_duration
-                        ixcut = 0
-                    self.dataset[0].data = np.concatenate((self.dataset[0].data[ixcut:], np.array(alldata, ndmin=2)), axis=0)
-                    self.dataset[0].timestamps = np.concatenate((self.dataset[0].timestamps[ixcut:], alltimestamps), axis=None)
-                else:
-                    self.dataset[0].data = np.array(alldata, ndmin=2)
-                    self.dataset[0].timestamps = alltimestamps
-            except KeyError:
-                self.dataset[0] = CCData(np.array(alldata, ndmin=2), alltimestamps, fs)
-
-            self.dataset[0].ntraces = self.dataset[0].data.shape[0]
-            self.dataset[0].npts = self.dataset[0].data.shape[1]
-            self.dataset[0].add_rms()
-            self.dataset[0].remove_nan_segments()
-            self.dataset[0].median = np.nanmedian(self.dataset[0].data, axis=0)
-        else:
-            self.dataset = {}
-
-        # only debugging
-        # if rank == 0:
-        #     assert np.all(self.dataset[0].data[0:3] == self.datafile["corr_windows"]["data"][0:3])
-        #     assert np.all(self.dataset[0].data[10:13] == self.datafile["corr_windows"]["data"][10:13])
-
-    def stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1, overwrite=False,
-              epsilon_robuststack=None):
-        #stack
-        if len(ixs) == 0:
-            return()
-
-        if rank != 0:
-            raise ValueError("Call this function only on one process")
-
-        to_stack = self.dataset[stacklevel_in].data
-        t_to_stack = self.dataset[stacklevel_in].timestamps.copy()
-
-        if stackmode == "linear":
-            s = to_stack[ixs].sum(axis=0).copy()
-            newstacks = s / len(ixs)
-            newt = t_to_stack[ixs[0]]
-        elif stackmode == "median":
-            newstacks = np.median(to_stack[ixs], axis=0)
-            newt = t_to_stack[ixs[0]]
-        elif stackmode == "robust":
-            newstacks, w, nstep = robust_stack(to_stack[ixs], epsilon_robuststack)
-            print(newstacks.shape, " NEWSTACKS ", nstep)
-            newt = t_to_stack[ixs[0]]
-        else:
-            raise ValueError("Unknown stacking mode {}".format(stackmode))
-        
-        try:
-            self.dataset[stacklevel_out].data = np.concatenate((self.dataset[stacklevel_out].data, np.array(newstacks, ndmin=2)), axis=0)
-            self.dataset[stacklevel_out].timestamps = np.concatenate((self.dataset[stacklevel_out].timestamps, newt), axis=None)
-
-        except KeyError:
-            self.dataset[stacklevel_out] = CCData(np.array(newstacks, ndmin=2), newt, self.dataset[stacklevel_in].fs)
-        
-        self.dataset[stacklevel_out].ntraces = self.dataset[stacklevel_out].data.shape[0]
 
     def run_measurement(self, indices, to_measure, timestamps,
                         ref, fs, lag, f0, f1, ngrid,
@@ -612,112 +395,18 @@ class CCDataset(object):
             dvv_error[i, :] = delta_dvvp
         return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
 
-    def measure_dvv_par(self, ref, f0, f1, stacklevel=1, method="stretching",
-                        ngrid=100, dvv_bound=0.03,
-                        measure_smoothed=False, indices=None,
-                        moving_window_length=None, moving_window_step=None,
-                        maxlag_dtw=0.0,
-                        len_dtw_msr=None):
-        # "WTF! Why is this so complicated??" -- I handled it this way because only rank 0 actually has the data
-        # The reason for this is that if we create copies of the entire dataset on multiple ranks, 
-        # the memory usage will drastically increase
-        if indices is not None:
-            if len(indices) < 10:
-                warn("This method measures all windows, if you are only planning to measure a few,\
-run measure_dvv_ser on one process.")
-        if rank == 0:
-            ndata = self.dataset[stacklevel].ntraces
-            nshare = ndata // size
-            nrest = ndata % size
-
-            to_measure = self.dataset[stacklevel].data[0: ndata - nrest]
-            timestamps = self.dataset[stacklevel].timestamps[0: ndata - nrest]
-            npts = self.dataset[stacklevel].npts
-            fs = self.dataset[stacklevel].fs
-            lag = self.dataset[stacklevel].lag
-        else:
-            ndata = None
-            nshare = None
-            to_measure = None
-            timestamps = None
-            npts = None
-            fs = None
-            nrest = None
-            lag = None
-        fs = comm.bcast(fs, root=0)
-        nshare = comm.bcast(nshare, root=0)
-        ndata = comm.bcast(ndata, root=0)
-        nrest = comm.bcast(nrest, root=0)
-        npts = comm.bcast(npts, root=0)
-        lag = comm.bcast(lag, root=0)
-
-        to_measure_part = np.zeros((nshare, npts))
-        timestamps_part = np.zeros(nshare)
-        dvv_all = np.zeros((ndata, 1))
-        dvv_error_all = np.zeros((ndata, 1))
-        timestamps_all = np.zeros((ndata, 1))
-        ccoeff_all = np.zeros((ndata, 1))
-        best_ccoeff_all = np.zeros((ndata, 1))
-        # scatter the arrays
-        comm.Scatter(to_measure, to_measure_part, root=0)
-        comm.Scatter(timestamps, timestamps_part, root=0)
-
-        # print("rank {}, nr traces to measure {}".format(rank, len(to_measure_part)))
-
-        dvv, dvv_times, ccoeff, best_ccoeff, dvv_error = \
-        self.run_measurement(indices, to_measure_part, timestamps_part,
-                             ref, fs, lag, f0, f1, ngrid,
-                             dvv_bound, method="stretching")
-
-        comm.Gather(dvv, dvv_all[0: ndata - nrest], root=0)
-        comm.Gather(dvv_times, timestamps_all[: ndata - nrest], root=0)
-        comm.Gather(dvv_error, dvv_error_all[: ndata - nrest], root=0)
-        comm.Gather(ccoeff, ccoeff_all[: ndata - nrest], root=0)
-        comm.Gather(best_ccoeff, best_ccoeff_all[: ndata - nrest], root=0)
-
-        if rank == 0:
-            #print(dvv_all.shape)
-            #print(ndata)
-            #print(nrest)
-            if nrest > 0:
-                to_measure_extra = self.dataset[stacklevel].data[ndata - nrest:]
-                timestamps_extra = self.dataset[stacklevel].timestamps[ndata - nrest:]
-                if indices is None:
-                    indices = range(len(to_measure_extra))
-                dvv, dvv_times, ccoeff, best_ccoeff, dvv_error = \
-                self.run_measurement(indices, to_measure_extra, timestamps_extra,
-                                     ref, fs, lag, f0, f1, ngrid,
-                                     dvv_bound, method="stretching")
-              
-                dvv_all[ndata - nrest:, :] = dvv
-                timestamps_all[ndata - nrest:, 0] = dvv_times
-                ccoeff_all[ndata - nrest:, 0] = ccoeff
-                best_ccoeff_all[ndata - nrest:, 0] = best_ccoeff
-                dvv_error_all[ndata - nrest:, :] = dvv_error
-            else:
-                pass
-        else:
-            pass
-
-        comm.barrier()
-
-        if rank == 0:
-            return(dvv_all, timestamps, ccoeff_all, best_ccoeff_all, dvv_error_all, [])
-        else:
-            return([],[],[],[],[],[])
-
-    def measure_dvv_ser(self, ref, f0, f1, stacklevel=1, method="stretching",
+    def measure_dvv_ser(self, ref, f0, f1, method="stretching",
                         ngrid=90, dvv_bound=0.03,
                         measure_smoothed=False, indices=None,
                         moving_window_length=None, moving_window_step=None,
                         maxlag_dtw=0.0,
                         len_dtw_msr=None):
 
-        to_measure = self.dataset[stacklevel].data
-        lag = self.dataset[stacklevel].lag
-        timestamps = self.dataset[stacklevel].timestamps
+        to_measure = self.data
+        lag = self.lag
+        timestamps = self.timestamps
         # print(timestamps)
-        fs = self.dataset[stacklevel].fs
+        fs = self.fs
 
         if len(to_measure) == 0:
             return()
@@ -791,147 +480,229 @@ run measure_dvv_ser on one process.")
         return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
 
 
-    def filter_data(self, taper_perc=0.1, filter_type="bandpass", stacklevel=0,
-                    f_hp=None, f_lp=None, corners=4, zerophase=True,
-                    maxorder=8, npool=1):
+    def post_whiten(self, f1, f2, npts_smooth=5, freq_norm="rma"):
 
-        """
-        Parallel filtering using scipy second order section filter
-        """
-
-        if rank == 0:
-            ndata = self.dataset[stacklevel].ntraces
-            nshare = ndata // size
-            nrest = ndata % size
-            to_filter = self.dataset[stacklevel].data[0: ndata - nrest]
-            npts = self.dataset[stacklevel].npts
-            fs = self.dataset[stacklevel].fs
-        else:
-            nshare = None
-            to_filter = None
-            npts = None
-            fs = None
-            nrest = None
-        fs = comm.bcast(fs, root=0)
-        nshare = comm.bcast(nshare, root=0)
-        nrest = comm.bcast(nrest, root=0)
-        npts = comm.bcast(npts, root=0)
-        to_filter_part = np.zeros((nshare, npts))
-
-        # scatter the arrays
-        comm.Scatter(to_filter, to_filter_part, root=0)
-
-        # check that the input array has 2 dimensions
-        if not np.ndim(to_filter_part) == 2:
-            raise ValueError("Input array for filtering must have dimensions of n_traces * n_samples")
-
-        # define taper to avoid high-freq. artefacts
-        taper = cosine_taper(npts, taper_perc)
-
-        # define filter
-        if filter_type == 'bandpass':
-            if None in [f_hp, f_lp]:
-                raise TypeError("f_hp and f_lp (highpass and lowpass frequency) must be floats.")
-            sos = filter.bandpass(df=fs, freqmin=f_hp, freqmax=f_lp,
-                                  corners=corners)
-        elif filter_type == 'lowpass':
-            sos = filter.lowpass(df=fs, freq=f_lp, corners=corners)
-        elif filter_type == 'highpass':
-            sos = filter.highpass(df=fs, freq=f_hp, corners=corners)
-        elif filter_type == "cheby2_bandpass":
-            sos = filter.cheby2_bandpass(df=fs, freq0=f_hp, freq1=f_lp,
-                                         maxorder=maxorder)
-        elif filter_type == "cwt":
-            taper = cosine_taper(npts, taper_perc)
-            for i, tr in enumerate(to_filter_part):
-                to_filter[i, :] = filter.cwt_bandpass(tr, f_hp, f_lp, df=fs)
-        else:
-            msg = 'Filter %s is not implemented, implemented filters:\
-            bandpass, highpass,lowpass' % type
-            raise ValueError(msg)
-
-        if filter_type != "cwt":
-            for i, tr in enumerate(to_filter_part):
-                if zerophase:
-                    to_filter_part[i, :] = sosfiltfilt(sos, taper * tr, padtype="even")
-                else:
-                    to_filter_part[i, :] = sosfilt(sos, taper * tr)
-
-        # gather
-        comm.Gather(to_filter_part, to_filter, root=0)
-
-        # do the rest
-        if rank == 0 and nrest > 0:
-            filt_rest = []
-            for ixdata in range(ndata - nrest, ndata):
-                tr = self.dataset[stacklevel].data[ixdata, :]
-                if zerophase:
-                    filttr = sosfiltfilt(sos, taper * tr, padtype="even")
-                else:
-                    filttr = sosfilt(sos, taper * tr)
-                filt_rest.append(filttr)
-            self.dataset[stacklevel].data[ndata - nrest: ndata] = np.array(filt_rest)
-
-
-    def post_whiten(self, f1, f2, stacklevel=0, npts_smooth=5, freq_norm="rma"):
-
-        if rank == 0:
-            nfft = int(next_fast_len(self.dataset[stacklevel].npts))
-            td_taper = cosine_taper(self.dataset[stacklevel].npts, 0.1)
-            ndata = len(self.dataset[stacklevel].data)
-            nshare = ndata // size
-            nrest = ndata % size
-            to_filter = self.dataset[stacklevel].data[0: ndata - nrest]
-            npts = self.dataset[stacklevel].npts
-            # print(npts)
-            fs = self.dataset[stacklevel].fs
-            freq = np.fft.fftfreq(n=nfft,
-                                  d=1./fs)
-        else:
-            nshare = None
-            to_filter = None
-            npts = None
-            fs = None
-            nrest = None
-            freq = None
-            td_taper = None
-            nfft = None
-        nfft = comm.bcast(nfft, root=0)
-        fs = comm.bcast(fs, root=0)
-        freq = comm.bcast(freq, root=0)
-        nshare = comm.bcast(nshare, root=0)
-        nrest = comm.bcast(nrest, root=0)
-        npts = comm.bcast(npts, root=0)
-        to_filter_part = np.zeros((nshare, npts))
-        td_taper = comm.bcast(td_taper, root=0)
+        nfft = int(next_fast_len(self.npts))
+        td_taper = cosine_taper(self.npts, 0.1)
+        to_filter = self.data
+        npts = self.npts
+        # print(npts)
+        fs = self.fs
+        freq = np.fft.fftfreq(n=nfft,
+                              d=1./self.fs)
         fft_para = {"dt": 1./fs,
                     "freqmin": f1,
                     "freqmax": f2,
                     "smooth_N": npts_smooth,
                     "freq_norm": freq_norm}
 
-        # scatter the arrays
-        comm.Scatter(to_filter, to_filter_part, root=0)
-
-        for i, tr in enumerate(to_filter_part):
+        for i, tr in enumerate(to_filter):
             spec = whiten(td_taper * tr, fft_para)
-            to_filter_part[i, :] = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
+            to_filter[i, :] = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
 
-        # pass back
-        # gather
-        comm.Gather(to_filter_part, to_filter, root=0)
 
-        # do the rest
-        if rank == 0 and nrest > 0:
-            filt_rest = []
-            for ixdata in range(ndata - nrest, ndata):
-                tr = self.dataset[stacklevel].data[ixdata, :]
-                spec = whiten(td_taper * tr, fft_para)
-                tr = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
-                filt_rest.append(tr)
-            self.dataset[stacklevel].data[ndata - nrest: ndata] = np.array(filt_rest)
+    def interpolate_stacks(self, new_fs):
+        """
+        Cubic interpolation to new sampling rate
+        More fancy interpolations (like Lanczos) are a bit too expensive 
+        """
+        if (new_fs % self.fs) != 0:
+            raise ValueError("Only integer-factor resampling is permitted.")
+
+        stacks = self.data
+        new_npts = int((self.npts - 1.) / self.fs * new_fs) + 1
+        new_lag = np.linspace(-self.max_lag, self.max_lag, new_npts)
+
+        newstacks = []
+        for stack in stacks:
+            f = interp1d(self.lag, stack, kind="cubic")
+            newstacks.append(f(new_lag))
+        self.data = np.array(newstacks)
+        self.lag = new_lag
+        self.npts = new_npts
+        self.fs = 1. / (new_lag[1] - new_lag[0])
+
+
+class CCDataset_serial(object):
+    """
+    An object that holds a dictionary of CCData objects and can perform all sorts
+    of stuff on them. For all operations like 
+    ...
+
+    Attributes
+    ----------
+    :type inputfile:  string
+    :param inpytfile: File path to hdf5 file produced by ants_2 python code
+    :type ref: numpy.ndarray or None
+    :param ref: reference trace (can be passed later)
+    
+
+    Methods
+    -------
+    add_datafile(self, inputfile)
+    __str__(self)
+    data_to_memory(self,ix_corr_max=None, ix_corr_min=None, keep_duration=0,
+    normalize=False)
+    stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1, overwrite=False,
+              epsilon_robuststack=None)
+    """
+
+    def __init__(self, inputfile):
+        """
+        :type inputfile: string
+        :param inputfile: File path to hdf5 file
+        :type ref: numpy.ndarray or None
+        :param ref: reference trace, e.g. from another file
+
+        """
+
+        self.station_pair = os.path.splitext(os.path.basename(inputfile))[0]
+        self.station_pair = os.path.splitext(self.station_pair)[0]
+        self.station_pair = os.path.splitext(self.station_pair)[0]
+        self.datafile = h5py.File(inputfile, 'r')
+        self.dataset = {}
+
+    def add_datafile(self, inputfile):
+
+        self.datafile.close()
+        self.station_pair = os.path.splitext(os.path.basename(inputfile))[0]
+        self.station_pair = os.path.splitext(self.station_pair)[0]
+        self.station_pair = os.path.splitext(self.station_pair)[0]
+        self.datafile = h5py.File(inputfile, 'r')
+
+    def __str__(self):
+
+        output = ""
+        output += "Cross-correlation dataset: {}\n".format(self.station_pair)
+        for (k, v) in self.dataset.items():
+            output += "Contains {} traces on stacking level {}\n".format(v.ntraces, k)
+            output += "Starting {}, ending {}\n".format(UTCDateTime(v.timestamps[0]).strftime("%d.%m.%Y"),
+                                                        UTCDateTime(v.timestamps[-1]).strftime("%d.%m.%Y"))
+        return(output)
+
+
+    def data_to_memory(self, ix_corr_max=None, ix_corr_min=None, keep_duration=0,
+                       normalize=False):
+
+        """
+        Read data into memory and store in dataset[0]. Serial version (needed for clustering).
+        :type ix_corr_max: int
+        :param ix_corr_max: correlation traces will be read up unto the preceding index
+        :type ix_corr_min: int
+        :param ix_corr_min: correlation traces will be read starting at this index
+        :type keep_duration: int
+        :param keep duration: nr. of correlation traces to keep in dataset counting from the
+        end of the array (i.e. later in time).
+        The preceding traces will be discarded from memory.
+        :type normalize: Boolean
+        :param normalize: normalize each trace by its maximum or not
+        """
+        # read data from correlation file into memory and store in dataset[0]
+        # use self.datafile
+        # get fs, data, timestamps
+        # commit to a new dataset object or add it to existing
+        fs = dict(self.datafile['stats'].attrs)['sampling_rate']
+        npts = self.datafile['corr_windows']["data"][0].shape[0]
+        ntraces = len(np.where(self.datafile["corr_windows"]["timestamps"][:] != "")[0])
+
+        if ix_corr_max is None:
+            ix_corr_max = ntraces
+        if ix_corr_min is None:
+            ix_corr_min = 0
+
+        n_to_read = ix_corr_max - ix_corr_min
+
+        # allocate data
+        try:
+            data = np.zeros((ix_corr_max - ix_corr_min, npts))
+        except MemoryError:
+            print("Data doesn't fit in memory, set a lower n_corr_max")
+            return()
+        
+        # allocate timestamps array
+        timestamps = np.zeros(ix_corr_max - ix_corr_min)
+        for i in range(ix_corr_min, ix_corr_max):  # , v in enumerate(self.datafile["corr_windows"]["data"][:]):
+            v = self.datafile["corr_windows"]["data"][i]
+            tstamp = self.datafile["corr_windows"]["timestamps"][i]
+            data[i - ix_corr_min, :] = v
+
+            if tstamp == "":
+                continue
+            tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
+            timestamps[i - ix_corr_min] = UTCDateTime(tstmp).timestamp
+                
+
+        data = data[timestamps != 0.0]
+        timestamps = timestamps[timestamps != 0.0]
+       
+        if normalize:
+            # absolute last-resort-I-cannot-reprocess way to deal with amplitude issues
+            for tr in data:
+                tr /= tr.max()
+
+
+        if len(timestamps) > 0:
+            print("Read to memory from {} to {}".format(UTCDateTime(timestamps[0]),
+                                                        UTCDateTime(timestamps[-1])))
+
+            try:
+                if keep_duration != 0:
+                    if keep_duration > 0:
+                        ixcut = np.argmin(((self.dataset[0].timestamps[-1] -
+                                            self.dataset[0].timestamps) -
+                                            keep_duration) ** 2)
+
+                    else:  # keep all if negative keep_duration
+                        ixcut = 0
+                    self.dataset[0].data = np.concatenate((self.dataset[0].data[ixcut:], np.array(data, ndmin=2)), axis=0)
+                    self.dataset[0].timestamps = np.concatenate((self.dataset[0].timestamps[ixcut:], timestamps), axis=None)
+                else:
+                    self.dataset[0].data = np.array(data, ndmin=2)
+                    self.dataset[0].timestamps = timestamps
+            except KeyError:
+                self.dataset[0] = CCData_serial(np.array(data, ndmin=2), timestamps, fs)
+
+            self.dataset[0].ntraces = self.dataset[0].data.shape[0]
+            self.dataset[0].npts = self.dataset[0].data.shape[1]
+            self.dataset[0].add_rms()
+            self.dataset[0].remove_nan_segments()
+            self.dataset[0].median = np.nanmedian(self.dataset[0].data, axis=0)
         else:
-            pass
+            self.dataset = {}
+
+
+    def stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1, overwrite=False,
+              epsilon_robuststack=None):
+        #stack
+        if len(ixs) == 0:
+            return()
+
+        to_stack = self.dataset[stacklevel_in].data
+        t_to_stack = self.dataset[stacklevel_in].timestamps.copy()
+
+        if stackmode == "linear":
+            s = to_stack[ixs].sum(axis=0).copy()
+            newstacks = s / len(ixs)
+            newt = t_to_stack[ixs[0]]
+        elif stackmode == "median":
+            newstacks = np.median(to_stack[ixs], axis=0)
+            newt = t_to_stack[ixs[0]]
+        elif stackmode == "robust":
+            newstacks, w, nstep = robust_stack(to_stack[ixs], epsilon_robuststack)
+            print(newstacks.shape, " NEWSTACKS ", nstep)
+            newt = t_to_stack[ixs[0]]
+        else:
+            raise ValueError("Unknown stacking mode {}".format(stackmode))
+        
+        try:
+            self.dataset[stacklevel_out].data = np.concatenate((self.dataset[stacklevel_out].data, np.array(newstacks, ndmin=2)), axis=0)
+            self.dataset[stacklevel_out].timestamps = np.concatenate((self.dataset[stacklevel_out].timestamps, newt), axis=None)
+
+        except KeyError:
+            self.dataset[stacklevel_out] = CCData_serial(np.array(newstacks, ndmin=2), newt, self.dataset[stacklevel_in].fs)
+            print(self.dataset[stacklevel_out].data.shape)
+        
+        self.dataset[stacklevel_out].ntraces = self.dataset[stacklevel_out].data.shape[0]
 
     def plot_stacks(self, stacklevel=1, outfile=None, seconds_to_show=20, scale_factor_plotting=0.1,
                     plot_mode="heatmap", seconds_to_start=0.0, cmap=plt.cm.bone,
@@ -939,8 +710,6 @@ run measure_dvv_ser on one process.")
                     color_by_cc=False, normalize_all=False, label_style="month",
                     ax=None, plot_envelope=False, ref=None,
                     mark_17_quake=False, grid=True, marklags=[], colorful_traces=False):
-        if rank != 0:
-            raise ValueError("Call this function only on one process")
         if mask_gaps and step == None:
             raise ValueError("To mask the gaps, you must provide the step between successive windows.")
 

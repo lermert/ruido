@@ -23,7 +23,8 @@ setup(
         "pandas",
         "h5py",
         "pytest",
-        "mpi4py"],
+        "mpi4py",
+        "kneed"],
     entry_points = {
     },
 )

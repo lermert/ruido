@@ -49,7 +49,7 @@ def test_cc_data():
 
     dat = testdata.dataset[0]
 
-    dat.post_whiten(f1=0.1, f2=5.0)
+    testdata.post_whiten(f1=0.1, f2=5.0)
 
     dat.remove_nan_segments()
     # once test data synthetics are done add test here

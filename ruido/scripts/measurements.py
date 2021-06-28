@@ -36,9 +36,9 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
         ref = comm.bcast(ref, root=0)
 
         dvv, dvv_timest, ccoeff, \
-            best_ccoeff, dvv_error = dset.dataset[2].measure_dvv_par(f0=freq_band[0], f1=freq_band[1], ref=ref,
-                                                                    ngrid=100, method=conf["measurement_type"],
-                                                                    dvv_bound=maxdvv)
+            best_ccoeff, dvv_error = dset.measure_dvv_par(f0=freq_band[0], f1=freq_band[1], ref=ref, stacklevel=2,
+                                                          ngrid=100, method=conf["measurement_type"],
+                                                          dvv_bound=maxdvv)
         comm.barrier()
         if rank == 0:
             for j in range(i + 1, n):
@@ -50,16 +50,14 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
     return(dvv_timest, dvv, ccoeff, best_ccoeff, dvv_error, None)
 
 def measurement_incremental(dset, config, twin, freq_band, rank, comm,
-                         stacklevel=1):
-
+                            stacklevel=1):
+ 
     if rank == 0:
         references = np.cumsum(dset.dataset[stacklevel].data, axis=0)
         a = np.arange(1, references.shape[0] + 1)
         b = np.ones(references.shape)
         c = (a * b.T).T
         references /= c
-        print(dset.dataset[stacklevel].data.shape)
-        print(references.shape)
         stacks = dset.dataset[stacklevel].data
         timestamps = dset.dataset[stacklevel].timestamps
         fs = dset.dataset[stacklevel].fs
@@ -91,17 +89,16 @@ def measurement_incremental(dset, config, twin, freq_band, rank, comm,
         pass
 
     for ix in range(rank, ntraces, size):
-        print(ix)
         if ix > 0:
             ref = references[ix-1, :]
         else:
             ref = references[0, :]
         dvvp, dvv_timestp, ccoeffp, \
             best_ccoeffp, dvv_errorp, \
-                   = dset.dataset[stacklevel].measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
-                                             ref=ref, ngrid=config["ngrid"],
-                                             method=config["measurement_type"], indices=[ix],
-                                             dvv_bound=config["maxdvv"],
+                   = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1], stacklevel=stacklevel,
+                                          ref=ref, ngrid=config["ngrid"],
+                                           method=config["measurement_type"], indices=[ix],
+                                           dvv_bound=config["maxdvv"],
                                              )
         t[ix] = dvv_timestp[0]
         dvv[ix] = dvvp[0]
@@ -155,7 +152,6 @@ def measurement_trailing(dset, config, twin, freq_band, rank, comm,
         dset.dataset[2] = CCData(dset.dataset[1].data[0: 1].copy(),
                                  timestamps[0], fs)
         for i_d in range(1, ntraces):
-            print(i_d)
             ixs_stack = dset.dataset[0].group_for_stacking(t0=dset.dataset[stacklevel].timestamps[i_d] - restack_duration,
                                                            duration=restack_duration)
             a = 2
@@ -193,18 +189,19 @@ def measurement_trailing(dset, config, twin, freq_band, rank, comm,
         pass
 
     for ix in range(rank, ntraces, size):
-        print(ix)
         if ix > 0:
             ref = references[ix-1, :]
         else:
             ref = references[0, :]
         dvvp, dvv_timestp, ccoeffp, \
             best_ccoeffp, dvv_errorp, \
-            = dset.dataset[stacklevel].measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
-                                             ref=ref, ngrid=config["ngrid"],
-                                             method=config["measurement_type"], indices=[ix],
-                                             dvv_bound=config["maxdvv"],
-                                             )
+            = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
+                                   stacklevel=stacklevel,
+                                   ref=ref, ngrid=config["ngrid"],
+                                   method=config["measurement_type"],
+                                   indices=[ix],
+                                   dvv_bound=config["maxdvv"],
+                                   )
         t[ix] = dvv_timestp[0]
         dvv[ix] = dvvp[0]
         cc0[ix] = ccoeffp[0]
@@ -238,17 +235,15 @@ def measurement_trailing(dset, config, twin, freq_band, rank, comm,
         comm.Send(cc1, dest=0, tag=80)
         comm.Send(err, dest=0, tag=81)
 
-
     if rank == 0:
         return(timestamps, dvv_all, cc0_all, cc1_all, err_all, tags)
     else:
         return([], [], [], [], [], [])
-   
+
 def measurement_list(dset, config, twin, freq_band, rank, comm,
                      stacklevel=1):
-    
-    data = dset.dataset[stacklevel]
     if rank == 0:
+        data = dset.dataset[stacklevel]
         if config["reference_type"] == "list":
             ntraces = data.ntraces
             nt = data.npts
@@ -259,7 +254,6 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
 
                 ixs_stack = dset.dataset[0].group_for_stacking(t0=r_window[0].timestamp,
                                                                duration=r_window[1].timestamp - r_window[0].timestamp)
-                print(ixs_stack)
                 dset.stack(ixs_stack, stacklevel_in=1, stacklevel_out=2)
             references = dset.dataset[2].data
         elif config["reference_type"] == "bootstrap":
@@ -272,22 +266,32 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
             ref_duration = config["r_duration"]
             references = []
             tstmps_bs = dset.dataset[1].timestamps
-            last_ix = np.argmin(np.abs(tstmps_bs - tstmps_bs[-1] + ref_duration))
-            if len(tstmps_bs[:last_ix]) > 1:
-                tstmps_bs = tstmps_bs[:last_ix]
-            for i in range(bootstrap_n):
-                if len(tstmps_bs) > 1:
-                    tref = np.random.choice(tstmps_bs)
-                else:
-                    print("Useless case: only 1 stack.")
-                    print("{}-{}s, {}-{} Hz, {}".format(*twin, *freq_band, UTCDateTime(tstmps_bs[0])))
-                    tref = tstmps_bs[0]
-                print("random t: ", UTCDateTime(tref))
-                ws_ref = dset.dataset[0].group_for_stacking(t0=tref,
-                                                 duration=ref_duration,
-                                                 )
-                dset.stack(ws_ref, stacklevel_in=1, stacklevel_out=2)
-                references.append(dset.dataset[2].data[-1, :].copy())
+
+            if config["bootstrap_type"] == "consecutive":
+                last_ix = np.argmin(np.abs(tstmps_bs - tstmps_bs[-1] + ref_duration))
+                if len(tstmps_bs[:last_ix]) > 1:
+                    tstmps_bs = tstmps_bs[:last_ix]
+                for i in range(bootstrap_n):
+                    if len(tstmps_bs) > 1:
+                        tref = np.random.choice(tstmps_bs)
+                    else:
+                        print("Useless case: only 1 stack.")
+                        print("{}-{}s, {}-{} Hz, {}".format(*twin, *freq_band, UTCDateTime(tstmps_bs[0])))
+                        tref = tstmps_bs[0]
+                    
+                    if config["print_debug"]:
+                        print("random t: ", UTCDateTime(tref))
+                    ws_ref = dset.dataset[0].group_for_stacking(t0=tref,
+                                                     duration=ref_duration,
+                                                     )
+                    dset.stack(ws_ref, stacklevel_in=1, stacklevel_out=2)
+                    references.append(dset.dataset[2].data[-1, :].copy())
+            else:
+                for i in range(bootstrap_n):
+                    bsixs = np.random.choice(np.arange(len(tstmps_bs)),
+                            config["bootstrap_n_randomwindows"])
+                    dset.stack(bsixs, stacklevel_in=1, stacklevel_out=2)
+                    references.append(dset.dataset[2].data[-1, :].copy())
             references = np.array(references)
 
     else:
@@ -320,15 +324,15 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
         tags = np.zeros(ntraces)
 
         if rank > 0:
-            data = CCData(stacks, timestamps, fs)
+            dset.dataset[stacklevel] = CCData(stacks, timestamps, fs)
+
         else:
             pass
 
         for ix in range(rank, ntraces, size):
-            print(ix)
             dvvp, dvv_timestp, ccoeffp, \
-                best_ccoeffp, dvv_errorp, = data.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
-                                                 ref=ref, ngrid=config["ngrid"],
+                best_ccoeffp, dvv_errorp, = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
+                                                 ref=ref, ngrid=config["ngrid"], stacklevel=stacklevel,
                                                  method=config["measurement_type"], indices=[ix],
                                                  dvv_bound=config["maxdvv"],
                                                  )
@@ -376,7 +380,6 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
             pass
 
     if rank == 0:
-        print(tags_list)
         return(np.array(t_list), np.array(dvv_list), np.array(cc0_list),
                np.array(cc1_list), np.array(err_list), np.array(tags_list))
     else:

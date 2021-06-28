@@ -8,8 +8,25 @@
 # =================================================
 # GENERAL CONFIGURATION
 # =================================================
+# Print (more) output or not
+print_debug: true
 # Path to h5 files (e.g. from ants_2)
-input_directory: tests/testdata/
+# you can use wildcard "*" (e.g. if data split over
+# day or year directories with same name pattern) 
+# this will be the directory that clustering and 
+# stacking both look for input
+input_directories: tests/test*/
+# stations, channels to consider
+stations:
+- MULU
+channels:
+- HHE
+- HHN
+- HHZ
+# drop autocorrelations: if true, then all auto-
+# correlations (like BHE-BHE, BHN-BHN) etc will be 
+# ignored.
+drop_autocorrelations: false
 # frequency bands: These will be used throughout
 # clustering, stacking and measurement.
 freq_bands:
@@ -18,7 +35,8 @@ freq_bands:
 -   - 0.5
     - 1.0
 # filter type: "bandpass" (butterworth)
-# or "cheby2_bandpass"
+# or "cheby2_bandpass" (Chebysheff bandpass)
+# or "cheby2_lowpass" (Chebysheff lowpass)
 # filtering will be applied for clustering
 # and also before stacking
 filt_type: "bandpass"
@@ -26,45 +44,76 @@ filt_type: "bandpass"
 # only relevant for cheby2_bandpass filter
 filt_maxord: 18 
 # directory where to save clusters
-cluster_dir: output/clusters/
+cluster_dir: output/clusters
 # directory where to save stacks
 stack_dir: output/stacks
 # directory where to save measurements
 msr_dir: output/measurements
-# plot or not
-do_plots: true
-
 
 # =================================================
 # CLUSTERING CONFIGURATION
 # =================================================
 do_clustering: true
-do_window: true
+# Int. nr. of random samples to be pulled from each file
+# e.g.: If there are 5 files for station G.UNM..HHZ
+# then this will randomly select n_samples_each_file
+# from each of them.
+# if you want to use all available data, set to "all"
+n_samples_each_file: 1000
+# clustering is done in windows of the whole cc wave
+# form (assuming that not every wiggle up to very 
+# long lag is important). Windows are symmetric Tukey
+# around twin_mid (in seconds, of lag)
+# and with a duration of hw_factor times the 
+# longest period in the resp. frequency band.
 # center of window in terms of lag, seconds
 twin_mid: 0.0
 # halfwidth in terms of longest period
 hw_factor: 10
 # desired level of explaining variance by PCA
-expl_var: 0.95
-# nr. of random samples to be pulled from each file
-# e.g.: If there are 5 files for station G.UNM..HHZ
-# then this will randomly select n_samples_each_file
-# from each of them.
-# if you want to use all available, set to "all"
-# int or "all"
-n_samples_each_file: 1000
+expl_var: 0.9
 # n clusters to try out. 
 # the final number will be based on estimating 
 # the "knee" of the Bayesian information criterion 
 # (as implemented by Viens & Iwata)
-nclust: 
--   - 1
-    - 12
+nclustmax: 12
 
 # =================================================
 # STACKING CONFIGURATION
 # =================================================
-
+# duration of stack in seconds
+duration: 864000
+# step between stacks, in seconds
+step: 864000
+# minimum number of windows. Stacks with fewer windows
+# will be discarded
+minimum_stack_len: 100
+# Begin time: YYYY,ddd (Julian day) or YYYY,MM,DD
+t0: 1995,001
+# end time: YYYY,ddd (Julian day) or YYYY,MM,DD
+t1: 2021,02,01
+# type of stacking: linear or robust
+stackmode: linear
+# stopping criterion for the iterations of robust stack
+# ignored if stackmode is "linear"
+robuststack_epsilon: 1.e-3
+# apply spectral whitening before stack
+# whitening will be applied between 0.75 * the lowest
+# frequency and 1.5 the highest freq. of the relevant
+# frequency band
+do_whiten: false
+# smoothing window during spectral whitening in samples
+whiten_nsmooth: 10
+# selecting correlation windows by RMS amplitude
+# all windows over this percentile of RMS amplitude
+# will be discarded.
+# e.g. : with percentile_rms: 50, that half of the windows
+# with the largest amplitude will be discarded.
+# if you want to keep all windows, set to 100
+percentile_rms: 75
+# use waveform clusters for data selection during stacking
+# (see Viens & Iwata, JGR 2020)
+use_clusters: false
 
 # =================================================
 # MEASUREMENT CONFIGURATION
@@ -72,12 +121,22 @@ nclust:
 # measurement type: "stretching"
 measurement_type: stretching
 # reference type: "bootstrap" or "list" or "increment"
-reference_type: list
-# reference_length_days: only relevant for bootstrap
-reference_length_days: 365
+reference_type: bootstrap
 # how many samples for bootstrapping
-# (will be ignored for all other reference_type)
+# (will be ignored for all other reference_type) 
 bootstrap_samples: 50
+# bootstrap type: "consecutive" means that the start time
+# of the references is random, but then they are consecutive 
+# stacks of duration reference_length_days
+# "random" means that a random number of bootstrap_windows
+# will be picked for each reference.
+bootstrap_type: consecutive
+# if bootstrap_type is random, set here the number of random
+# windows for each reference
+bootstrap_n_randomwindows: 40000
+# reference_length_days: only relevant for bootstrap, and only
+# if bootstrap_type is "consecutive"
+reference_length_days: 365
 # specified reference windows: only relevant for "list"
 # specify a minimum of one pair (start end) in the format YYYY,jjj
 reference_list:

@@ -26,13 +26,10 @@ tuples of fmin, fmax"
         pass
     else:
         raise ValueError("Unknown reference type {}".format(config["reference_type"]))
-    
 
-    # directory setup
-    for dtry in [config["stack_dir"], config["msr_dir"],
-                 config["cluster_dir"]]:
-        if not os.path.exists(dtry):
-            os.makedirs(dtry)
+    config["t0"] = UTCDateTime(config["t0"])
+    config["t1"] = UTCDateTime(config["t1"])
+    
 
     # define the time windows
     config["plot_tmax"] = []
@@ -46,5 +43,19 @@ tuples of fmin, fmax"
         twinsf.append([ 8. * longest_t, 20. * longest_t])
         config["twins"].append(twinsf)
         config["plot_tmax"].append(10.0 * longest_t)
+
+
+    # directory setup
+    for dtry in [config["stack_dir"], config["msr_dir"],
+                 config["cluster_dir"]]:
+        try:
+            os.makedirs(dtry)
+        except FileExistsError:
+            pass
+        # copy metadata
+        t_now = UTCDateTime().strftime("%Y-%m-%dT%H.%M")
+        with open(os.path.join(dtry, "configfile_{}.yml".format(t_now)), "w") as coutf:
+            coutf.write(yaml.dump(config))
+
 
     return(config)
