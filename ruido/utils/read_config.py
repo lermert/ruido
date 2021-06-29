@@ -27,8 +27,8 @@ tuples of fmin, fmax"
     else:
         raise ValueError("Unknown reference type {}".format(config["reference_type"]))
 
-    config["t0"] = UTCDateTime(config["t0"])
-    config["t1"] = UTCDateTime(config["t1"])
+    config["t0"] = UTCDateTime(config["t0"]).timestamp
+    config["t1"] = UTCDateTime(config["t1"]).timestamp
     
 
     # define the time windows
@@ -46,8 +46,14 @@ tuples of fmin, fmax"
 
 
     # directory setup
-    for dtry in [config["stack_dir"], config["msr_dir"],
-                 config["cluster_dir"]]:
+    dtries = []
+    if config["do_clustering"]:
+        dtries.append(config["cluster_dir"])
+    if config["do_stacking"]:
+        dtries.append(config["stack_dir"])
+    if config["do_measurement"]:
+        dtries.append(config["msr_dir"])
+    for dtry in dtries:
         try:
             os.makedirs(dtry)
         except FileExistsError:

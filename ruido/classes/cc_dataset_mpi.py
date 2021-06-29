@@ -161,7 +161,7 @@ class CCData(object):
         newstacks = []
         for s in self.data:
             newstacks.append(envelope(s))
-        self.dataset = np.array(newstacks)
+        self.data = np.array(newstacks)
 
     def select_by_percentile(self, ixs, perc=90,
                              mode="upper", debug_mode=False):

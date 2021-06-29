@@ -178,7 +178,8 @@ def run_stacking(config, rank, size, comm):
                                     cltag = "_noclust"
                                 outfile = "{}.{}..{}--{}.{}..{}.ccc.stacks_{}days_{}-{}_bp{}{}.h5".format(
                                     network, station1, ch1, network, station2, ch2, config["duration"]//86400,
-                                    config["t0"].strftime("%Y"), config["t1"].strftime("%Y"),
+                                    UTCDateTime(config["t0"]).strftime("%Y"),
+                                    UTCDateTime(config["t1"]).strftime("%Y"),
                                     ixf, cltag)
                                 outfile = os.path.join(config["stack_dir"], outfile)
                                 outfile = h5py.File(outfile, "w")
@@ -187,6 +188,7 @@ def run_stacking(config, rank, size, comm):
                                 stats.attrs["sampling_rate"] = dset.dataset[stacklevel].fs
                                 stats.attrs["f0_Hz"] = freq_band[0]
                                 stats.attrs["f1_Hz"] = freq_band[1]
+                                stats.attrs["channel_id"] = channel_id
                                 for k, v in config.items():
                                     # this will save the configuration in the output file.
                                     # it also saves the configuration for measurements which is not really relevant
@@ -200,9 +202,9 @@ def run_stacking(config, rank, size, comm):
                                         stats.attrs[k] = outstr.format(*ll)
                                         print(outstr.format(*ll))
                                     elif k in ["t0", "t1"]:
-                                        stats.attrs[k] = v.strftime("%Y.%j.%H.%M.%S")
+                                        stats.attrs[k] = UTCDateTime(v).strftime("%Y.%j.%H.%M.%S")
                                     else:
-                                        stats.attrs[k] = v                                        
+                                        stats.attrs[k] = v
 
                                 cwin.create_dataset("data", data=dset.dataset[stacklevel].data)
 
