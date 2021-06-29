@@ -14,7 +14,7 @@ setup(
         'Topic :: Seismology',
         'Programming Language :: Python :: 3',
     ],
-    keywords = 'Ambient seismic noise', "seismology", "Earth Sciences"
+    keywords = "Ambient seismic noise seismology Earth Sciences"
     packages = find_packages(),
     package_data={},
     install_requires = [

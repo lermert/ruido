@@ -96,20 +96,35 @@ def run_clustering(config, rank, size, comm):
 
 
                     for freq_band in config["freq_bands"]:
-                        # The clustering is performed separately in different frequency bands. The selections may change depending on the frequency band.
+                        # The clustering is performed separately in different frequency bands.
+                        # The selections may change depending on the frequency band.
                         fmin, fmax = freq_band
                         twin_hw = config["hw_factor"] / fmin
+                        # copy before filtering
+                        dset.dataset[2] = CCData_serial(dset.dataset[1].data.copy(),
+                                                        dset.dataset[1].timestamps.copy(),
+                                                        dset.dataset[1].fs)
+                        # whitening?
+                        if config["do_whiten_cluster"]:
+                            if config["whiten_nsmooth_cluster"] > 1:
+                                fnorm = "rma"
+                            else:
+                                fnorm = "phase_only"
+                            dset.post_whiten(f1=freq_band[0] * 0.75,
+                                             f2=freq_band[1] * 1.5, stacklevel=2,
+                                             npts_smooth=config["whiten_nsmooth_cluster"],
+                                             freq_norm=fnorm)
                         # filter before clustering
-                        dset.dataset[1].filter_data(filter_type=config["filt_type"],
+                        dset.dataset[2].filter_data(filter_type=config["filt_type"],
                                          f_hp=fmin, f_lp=fmax, maxorder=config["filt_maxord"])
                         #window. The windows are all centered on lag 0 and extend to 10 / fmin
-                        dset.dataset[1].window_data(t_mid=config["twin_mid"], hw=twin_hw,
+                        dset.dataset[2].window_data(t_mid=config["twin_mid"], hw=twin_hw,
                                          window_type="tukey", tukey_alpha=0.5,
                                          cutout=False)
 
                         # perform PCA on the random subset
-                        dset.dataset[1].data = np.nan_to_num(dset.dataset[1].data)
-                        X = StandardScaler().fit_transform(dset.dataset[1].data)
+                        dset.dataset[2].data = np.nan_to_num(dset.dataset[2].data)
+                        X = StandardScaler().fit_transform(dset.dataset[2].data)
                         pca_rand = run_pca(X, min_cumul_var_perc=config["expl_var"])
                         # pca output is a scikit learn PCA object
                         # just for testing, run the Gaussian mixture here
@@ -123,8 +138,20 @@ def run_clustering(config, rank, size, comm):
                             print("Rank {} clustering {}-{} Hz band.".format(rank, *freq_band))
                             dset.add_datafile(datafile)
                             dset.data_to_memory(keep_duration=0)
+                            # whitening?
+                            if config["do_whiten_cluster"]:
+                                if config["whiten_nsmooth_cluster"] > 1:
+                                    fnorm = "rma"
+                                else:
+                                    fnorm = "phase_only"
+                                dset.post_whiten(f1=freq_band[0] * 0.75,
+                                                 f2=freq_band[1] * 1.5, stacklevel=0,
+                                                 npts_smooth=config["whiten_nsmooth_cluster"],
+                                                 freq_norm=fnorm)
+                            # filter
                             dset.dataset[0].filter_data(filter_type=config["filt_type"],
                                              f_hp=fmin, f_lp=fmax, maxorder=config["filt_maxord"])
+                            # window
                             dset.dataset[0].window_data(t_mid=config["twin_mid"], hw=twin_hw,
                                              window_type="tukey", tukey_alpha=0.5,
                                              cutout=False)

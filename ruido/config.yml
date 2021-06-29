@@ -80,6 +80,13 @@ expl_var: 0.9
 # the "knee" of the Bayesian information criterion 
 # (as implemented by Viens & Iwata)
 nclustmax: 12
+# apply spectral whitening before clustering
+# whitening will be applied between 0.75 * the lowest
+# frequency and 1.5 the highest freq. of the relevant
+# frequency band
+do_whiten_cluster: false
+# smoothing window during spectral whitening in samples
+whiten_nsmooth_cluster: 10
 
 # =================================================
 # STACKING CONFIGURATION

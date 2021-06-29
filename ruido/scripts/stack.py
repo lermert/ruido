@@ -89,30 +89,31 @@ def run_stacking(config, rank, size, comm):
         print("Running stacking.")
         print("*"*80)
     ids_done = []
-    # loop over components:
-    for station1 in config["stations"]:
-        for station2 in config["stations"]:
-            for ch1 in config["channels"]:
-                for ch2 in config["channels"]:
-                    channel_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
-                    if channel_id in ids_done:
-                        continue
-                    else:
-                        ids_done.append(channel_id)
-                        if config["print_debug"] and rank == 0:
-                            print(channel_id)
+    # loop over frequency bands
+    for ixf, freq_band in enumerate(config["freq_bands"]):
 
-                    if ch1 == ch2 and config["drop_autocorrelations"]:
-                        continue
-                    input_files = glob(os.path.join(config["input_directories"],
-                                                    "*{}*{}*{}*{}.*windows.h5".format(station1,
-                                                                                      ch1,
-                                                                                      station2,
-                                                                                      ch2)))
-                    if len(input_files) == 0:
-                        continue
-                    # loop over frequency bands
-                    for ixf, freq_band in enumerate(config["freq_bands"]):
+        # loop over components:
+        for station1 in config["stations"]:
+            for station2 in config["stations"]:
+                for ch1 in config["channels"]:
+                    for ch2 in config["channels"]:
+                        channel_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
+                        if channel_id in ids_done:
+                            continue
+                        else:
+                            ids_done.append(channel_id)
+                            if config["print_debug"] and rank == 0:
+                                print(channel_id)
+
+                        if ch1 == ch2 and config["drop_autocorrelations"]:
+                            continue
+                        input_files = glob(os.path.join(config["input_directories"],
+                                                        "*{}*{}*{}*{}.*windows.h5".format(station1,
+                                                                                          ch1,
+                                                                                          station2,
+                                                                                          ch2)))
+                        if len(input_files) == 0:
+                            continue
 
                         if config["use_clusters"]:
                             clusterfile = os.path.join(config["cluster_dir"],
