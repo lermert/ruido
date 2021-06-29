@@ -18,6 +18,9 @@ if config["do_clustering"]:
         print("Rank {} is back from clustering.".format(rank))
     comm.Barrier()
 
-stack.run_stacking(config, rank, size, comm)
+if config["do_stacking"]:
+    stack.run_stacking(config, rank, size, comm)
+    comm.Barrier()
 
-measure.run_measure(config, rank, size, comm)
+if config["do_measurement"]:
+    measure.run_measure(config, rank, size, comm)

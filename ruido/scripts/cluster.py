@@ -36,7 +36,7 @@ def run_clustering(config, rank, size, comm):
                     else:
                         ids_done.append(channel_id)
                         if config["print_debug"]:
-                            print("clustering ", channel_id)
+                            print("Rank {} clustering ".format(rank), channel_id)
                     if config["drop_autocorrelations"] and ch1 == ch2:
                         continue
 
@@ -120,8 +120,7 @@ def run_clustering(config, rank, size, comm):
 
                         # now go through all files again, read, filter, window, and fit the pcs
                         for datafile in datafiles:
-                            print("Clustering {}-{} Hz band.".format(*freq_band))
-                            print(datafile)
+                            print("Rank {} clustering {}-{} Hz band.".format(rank, *freq_band))
                             dset.add_datafile(datafile)
                             dset.data_to_memory(keep_duration=0)
                             dset.dataset[0].filter_data(filter_type=config["filt_type"],

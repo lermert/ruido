@@ -30,7 +30,7 @@ def add_stacks(dset, config, rank, t_running_in=None):
     if dset.dataset[0].cluster_labels is not None:
 
         for clabel in np.unique(dset.dataset[0].cluster_labels):
-            print("cluster ", clabel)
+            # print("cluster ", clabel)
             if clabel == -1:   # the unmatched timestamps
                 warn("Unmatched timestamps present, is this ok?")
                 continue
@@ -99,7 +99,7 @@ def run_stacking(config, rank, size, comm):
                         continue
                     else:
                         ids_done.append(channel_id)
-                        if config["print_debug"]:
+                        if config["print_debug"] and rank == 0:
                             print(channel_id)
 
                     if ch1 == ch2 and config["drop_autocorrelations"]:
