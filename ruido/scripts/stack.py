@@ -88,10 +88,9 @@ def run_stacking(config, rank, size, comm):
         print("*"*80)
         print("Running stacking.")
         print("*"*80)
-    ids_done = []
     # loop over frequency bands
     for ixf, freq_band in enumerate(config["freq_bands"]):
-
+        ids_done = []
         # loop over components:
         for station1 in config["stations"]:
             for station2 in config["stations"]:

@@ -63,13 +63,6 @@ def run_measure(config, rank, size, comm):
             if dset.dataset[0].fs != config["new_fs"]:
                 dset.dataset[0].interpolate_stacks(new_fs=config["new_fs"])
 
-            if config["do_plots"]:
-                plot_output = re.sub("\.h5", "_{}.png".format(ixf),
-                                     os.path.basename(input_file))
-                dset.plot_stacks(stacklevel=0, label_style="year",
-                                 seconds_to_show=config["plot_tmax"][ixf],
-                                 outfile=plot_output)
-
         # find max. dvv that will just be short of a cycle skip
         # then extend by skipfactor
         for twin in config["twins"][ixf]:
