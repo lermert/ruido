@@ -95,8 +95,8 @@ def run_stacking(config, rank, size, comm):
         # loop over components:
         for station1 in config["stations"]:
             for station2 in config["stations"]:
-                for ch1 in config["channels"]:
-                    for ch2 in config["channels"]:
+                for ixch1, ch1 in enumerate(config["channels"]):
+                    for ch2 in config["channels"][ixch1: ]:
                         channel_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
                         if channel_id in ids_done:
                             continue
