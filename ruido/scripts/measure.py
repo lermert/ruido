@@ -52,6 +52,20 @@ def run_measure(config, rank, size, comm):
         station2 = os.path.basename(input_file.split(".")[4])
         ch1 = os.path.basename(input_file.split(".")[3][0: 3])
         ch2 = os.path.basename(input_file.split(".")[5])
+
+        ch_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
+        if iinf == 0:
+            ch_id_prev = ch_id
+
+        if ch_id != ch_id_prev:
+            # at the end write all to file
+            if rank == 0:
+                outfile_name = "{}_{}_{}.csv".format(ch_id, config["measurement_type"],
+                                                     config["reference_type"])
+                output.to_csv(os.path.join(config["msr_dir"], outfile_name))
+            ch_id_prev = ch_id
+
+        
         freq_band = config["freq_bands"][ixf]
 
         # read into memory
@@ -98,8 +112,4 @@ def run_measure(config, rank, size, comm):
             else:
                 pass
 
-        # at the end write all to file
-        if rank == 0:
-            outfile_name = "{}.{}-{}.{}_{}_{}.csv".format(station1, ch1, station2, ch2, config["measurement_type"],
-                                                      config["reference_type"])
-            output.to_csv(os.path.join(config["msr_dir"], outfile_name))
+        
