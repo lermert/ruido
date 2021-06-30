@@ -98,8 +98,8 @@ def run_measure(config, rank, size, comm):
             else:
                 pass
 
-    # at the end write all to file
-    if rank == 0:
-        outfile_name = "{}.{}-{}.{}_{}_{}.csv".format(station1, ch1, station2, ch2, config["measurement_type"],
-                                                  config["reference_type"])
-        output.to_csv(os.path.join(config["msr_dir"], outfile_name))
+        # at the end write all to file
+        if rank == 0:
+            outfile_name = "{}.{}-{}.{}_{}_{}.csv".format(station1, ch1, station2, ch2, config["measurement_type"],
+                                                      config["reference_type"])
+            output.to_csv(os.path.join(config["msr_dir"], outfile_name))

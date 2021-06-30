@@ -120,7 +120,7 @@ def run_clustering(config, rank, size, comm):
                         #window. The windows are all centered on lag 0 and extend to 10 / fmin
                         dset.dataset[2].window_data(t_mid=config["twin_mid"], hw=twin_hw,
                                          window_type="tukey", tukey_alpha=0.5,
-                                         cutout=False)
+                                         cutout=True)
 
                         # perform PCA on the random subset
                         dset.dataset[2].data = np.nan_to_num(dset.dataset[2].data)
@@ -154,7 +154,7 @@ def run_clustering(config, rank, size, comm):
                             # window
                             dset.dataset[0].window_data(t_mid=config["twin_mid"], hw=twin_hw,
                                              window_type="tukey", tukey_alpha=0.5,
-                                             cutout=False)
+                                             cutout=True)
                             dset.dataset[0].data = np.nan_to_num(dset.dataset[0].data)
                             X = StandardScaler().fit_transform(dset.dataset[0].data)
                             # expand the data in the principal component basis:

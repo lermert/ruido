@@ -2,7 +2,7 @@
 ## CONFIGURATION FILE FOR RUIDO                  ##
 ## copy this file to working dir. and edit       ##
 ## pass the path to the edited file as argument  ##
-## to run.py                                     ##
+## to ruido_main.py                              ##
 ###################################################
 
 # =================================================
