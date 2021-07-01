@@ -51,7 +51,7 @@ def run_measure(config, rank, size, comm):
 
         station2 = os.path.basename(input_file.split(".")[4])
         ch1 = os.path.basename(input_file.split(".")[3][0: 3])
-        ch2 = os.path.basename(input_file.split(".")[5])
+        ch2 = os.path.basename(input_file.split(".")[4])
 
         ch_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
         if iinf == 0:
