@@ -63,5 +63,8 @@ tuples of fmin, fmax"
         with open(os.path.join(dtry, "configfile_{}.yml".format(t_now)), "w") as coutf:
             coutf.write(yaml.dump(config))
 
+    # make sure station names are strings
+    config["stations"] = [str(sta) for sta in config["stations"]]
+
 
     return(config)

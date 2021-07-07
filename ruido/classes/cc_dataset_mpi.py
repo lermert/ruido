@@ -483,7 +483,7 @@ class CCDataset(object):
             try:
                 if keep_duration != 0:
                     if keep_duration > 0:
-                        ixcut = np.argmin(((self.dataset[0].max() -
+                        ixcut = np.argmin(((self.dataset[0].timestamps.max() -
                                             self.dataset[0].timestamps) -
                                             keep_duration) ** 2)
 

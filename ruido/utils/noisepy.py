@@ -2,12 +2,11 @@ import os
 import scipy
 import time
 import numpy as np
-from numba import jit
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack import fft,ifft,next_fast_len
 from obspy.signal.regression import linear_regression
-from numba import jit, float64, int32
-from numba.types import UniTuple
+# from numba import jit, float64, int32
+# from numba.types import UniTuple
 
 '''
 Functions ported / modified from NoisePy (https://noise-python.readthedocs.io/en/latest/)
@@ -42,7 +41,7 @@ SOFTWARE.
 
 '''
 
-@jit(nopython = True)
+# @jit(nopython = True)
 def moving_ave(A,N):
     '''
     this Numba compiled function does running smooth average for an array.
@@ -200,98 +199,98 @@ def whiten(data, fft_para):
     return FFTRawSign
 
 
-@jit(UniTuple(float64, 4)(float64[:], float64[:], float64, int32, float64,
-                             float64, float64, float64, float64),nopython=True)
-def stretching_nb(ref, cur, dv_range, nbtrial, tmin, tmax, fmin, fmax, dt):
+# @jit(UniTuple(float64, 4)(float64[:], float64[:], float64, int32, float64,
+#                              float64, float64, float64, float64),nopython=True)
+# def stretching_nb(ref, cur, dv_range, nbtrial, tmin, tmax, fmin, fmax, dt):
     
-    """
-    This function compares the Reference waveform to stretched/compressed current waveforms to get the relative seismic velocity variation (and associated error).
-    It also computes the correlation coefficient between the Reference waveform and the current waveform.
+#     """
+#     This function compares the Reference waveform to stretched/compressed current waveforms to get the relative seismic velocity variation (and associated error).
+#     It also computes the correlation coefficient between the Reference waveform and the current waveform.
     
-    PARAMETERS:
-    ----------------
-    ref: Reference waveform (np.ndarray, size N)
-    cur: Current waveform (np.ndarray, size N)
-    dv_range: absolute bound for the velocity variation; example: dv=0.03 for [-3,3]% of relative velocity change ('float')
-    nbtrial: number of stretching coefficient between dvmin and dvmax, no need to be higher than 100  ('float')
-    para: vector of the indices of the cur and ref windows on wich you want to do the measurements (np.ndarray, size tmin*delta:tmax*delta)
-    For error computation, we need parameters:
-        fmin: minimum frequency of the data
-        fmax: maximum frequency of the data
-        tmin: minimum time window where the dv/v is computed 
-        tmax: maximum time window where the dv/v is computed 
-    RETURNS:
-    ----------------
-    dv: Relative velocity change dv/v (in %)
-    cc: correlation coefficient between the reference waveform and the best stretched/compressed current waveform
-    cdp: correlation coefficient between the reference waveform and the initial current waveform
-    error: Errors in the dv/v measurements based on Weaver et al (2011), On the precision of noise-correlation interferometry, Geophys. J. Int., 185(3)
+#     PARAMETERS:
+#     ----------------
+#     ref: Reference waveform (np.ndarray, size N)
+#     cur: Current waveform (np.ndarray, size N)
+#     dv_range: absolute bound for the velocity variation; example: dv=0.03 for [-3,3]% of relative velocity change ('float')
+#     nbtrial: number of stretching coefficient between dvmin and dvmax, no need to be higher than 100  ('float')
+#     para: vector of the indices of the cur and ref windows on wich you want to do the measurements (np.ndarray, size tmin*delta:tmax*delta)
+#     For error computation, we need parameters:
+#         fmin: minimum frequency of the data
+#         fmax: maximum frequency of the data
+#         tmin: minimum time window where the dv/v is computed 
+#         tmax: maximum time window where the dv/v is computed 
+#     RETURNS:
+#     ----------------
+#     dv: Relative velocity change dv/v (in %)
+#     cc: correlation coefficient between the reference waveform and the best stretched/compressed current waveform
+#     cdp: correlation coefficient between the reference waveform and the initial current waveform
+#     error: Errors in the dv/v measurements based on Weaver et al (2011), On the precision of noise-correlation interferometry, Geophys. J. Int., 185(3)
 
-    Note: The code first finds the best correlation coefficient between the Reference waveform and the stretched/compressed current waveform among the "nbtrial" values. 
-    A refined analysis is then performed around this value to obtain a more precise dv/v measurement .
+#     Note: The code first finds the best correlation coefficient between the Reference waveform and the stretched/compressed current waveform among the "nbtrial" values. 
+#     A refined analysis is then performed around this value to obtain a more precise dv/v measurement .
 
-    Originally by L. Viens 04/26/2018 (Viens et al., 2018 JGR)
-    modified by Chengxin Jiang & Laura Ermert (numba)
-    """ 
-    # load common variables from dictionary
-    # twin = para['twin']
-    # freq = para['freq']
-    # dt   = para['dt']
-    # tmin = np.min(twin)
-    # tmax = np.max(twin)
-    # fmin = np.min(freq)
-    # fmax = np.max(freq)
-    tvec = np.arange(tmin,tmax,dt)
-    # make useful one for measurements
-    dvmin = -np.abs(dv_range)
-    dvmax = np.abs(dv_range)
-    Eps = 1+(np.linspace(dvmin, dvmax, nbtrial))
-    cof = np.zeros(Eps.shape,dtype=np.float32)
+#     Originally by L. Viens 04/26/2018 (Viens et al., 2018 JGR)
+#     modified by Chengxin Jiang & Laura Ermert (numba)
+#     """ 
+#     # load common variables from dictionary
+#     # twin = para['twin']
+#     # freq = para['freq']
+#     # dt   = para['dt']
+#     # tmin = np.min(twin)
+#     # tmax = np.max(twin)
+#     # fmin = np.min(freq)
+#     # fmax = np.max(freq)
+#     tvec = np.arange(tmin,tmax,dt)
+#     # make useful one for measurements
+#     dvmin = -np.abs(dv_range)
+#     dvmax = np.abs(dv_range)
+#     Eps = 1+(np.linspace(dvmin, dvmax, nbtrial))
+#     cof = np.zeros(Eps.shape,dtype=np.float32)
 
-    # Set of stretched/compressed current waveforms
-    for ii in range(len(Eps)):
-        nt = tvec*Eps[ii]
-        s = np.interp(x=tvec, xp=nt, fp=cur)
-        waveform_ref = ref
-        waveform_cur = s
-        cof[ii] = np.corrcoef(waveform_ref, waveform_cur)[0, 1]
-        if np.isnan(cof[ii]):
-            cof[ii] = -100.
+#     # Set of stretched/compressed current waveforms
+#     for ii in range(len(Eps)):
+#         nt = tvec*Eps[ii]
+#         s = np.interp(x=tvec, xp=nt, fp=cur)
+#         waveform_ref = ref
+#         waveform_cur = s
+#         cof[ii] = np.corrcoef(waveform_ref, waveform_cur)[0, 1]
+#         if np.isnan(cof[ii]):
+#             cof[ii] = -100.
 
-    cdp = np.corrcoef(cur, ref)[0, 1] # correlation coefficient between the reference and initial current waveforms
+#     cdp = np.corrcoef(cur, ref)[0, 1] # correlation coefficient between the reference and initial current waveforms
 
-    # find the maximum correlation coefficient
-    imax = np.argmax(cof)
-    if imax >= len(Eps)-2:
-        imax = imax - 2
-    if imax <= 2:
-        imax = imax + 2
+#     # find the maximum correlation coefficient
+#     imax = np.argmax(cof)
+#     if imax >= len(Eps)-2:
+#         imax = imax - 2
+#     if imax <= 2:
+#         imax = imax + 2
 
-    # Proceed to the second step to get a more precise dv/v measurement
-    dtfiner = np.linspace(Eps[imax-2], Eps[imax+2], 100)
-    ncof    = np.zeros(dtfiner.shape,dtype=np.float32)
-    for ii in range(len(dtfiner)):
-        nt = tvec*dtfiner[ii]
-        s = np.interp(x=tvec, xp=nt, fp=cur)
-        waveform_ref = ref
-        waveform_cur = s
-        ncof[ii] = np.corrcoef(waveform_ref, waveform_cur)[0, 1]
-        if np.isnan(ncof[ii]):
-            ncof[ii] = -100.
+#     # Proceed to the second step to get a more precise dv/v measurement
+#     dtfiner = np.linspace(Eps[imax-2], Eps[imax+2], 100)
+#     ncof    = np.zeros(dtfiner.shape,dtype=np.float32)
+#     for ii in range(len(dtfiner)):
+#         nt = tvec*dtfiner[ii]
+#         s = np.interp(x=tvec, xp=nt, fp=cur)
+#         waveform_ref = ref
+#         waveform_cur = s
+#         ncof[ii] = np.corrcoef(waveform_ref, waveform_cur)[0, 1]
+#         if np.isnan(ncof[ii]):
+#             ncof[ii] = -100.
 
-    cc = np.max(ncof) # Find maximum correlation coefficient of the refined  analysis
-    dv = 100. * dtfiner[np.argmax(ncof)]-100 # Multiply by 100 to convert to percentage (Epsilon = -dt/t = dv/v)
+#     cc = np.max(ncof) # Find maximum correlation coefficient of the refined  analysis
+#     dv = 100. * dtfiner[np.argmax(ncof)]-100 # Multiply by 100 to convert to percentage (Epsilon = -dt/t = dv/v)
 
-    # Error computation based on Weaver et al (2011), On the precision of noise-correlation interferometry, Geophys. J. Int., 185(3)
-    T = 1 / (fmax - fmin)
-    X = cc
-    wc = np.pi * (fmin + fmax)
-    t1 = tmin
-    t2 = tmax
-    error = 100*(np.sqrt(1-X**2)/(2*X)*np.sqrt((6* np.sqrt(np.pi/2)*T)/(wc**2*(t2**3-t1**3))))
-    cc = float64(cc)
+#     # Error computation based on Weaver et al (2011), On the precision of noise-correlation interferometry, Geophys. J. Int., 185(3)
+#     T = 1 / (fmax - fmin)
+#     X = cc
+#     wc = np.pi * (fmin + fmax)
+#     t1 = tmin
+#     t2 = tmax
+#     error = 100*(np.sqrt(1-X**2)/(2*X)*np.sqrt((6* np.sqrt(np.pi/2)*T)/(wc**2*(t2**3-t1**3))))
+#     cc = float64(cc)
 
-    return (dv, error, cc, cdp)
+#     return (dv, error, cc, cdp)
 
 
 def stretching_vect(ref, cur, dv_range, nbtrial, para):
