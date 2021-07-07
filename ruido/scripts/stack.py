@@ -32,9 +32,9 @@ def add_stacks(dset, config, rank):
     if dset.dataset[0].cluster_labels is not None:
 
         for clabel in np.unique(dset.dataset[0].cluster_labels):
-            if len(dset.dataset) > 1:
+            try:
                 t_running = dset.dataset[clabel + 1].timestamps.max() + config["step"]
-            else:
+            except KeyError:
                 t_running = max(config["t0"], dset.dataset[0].timestamps.min())
             # print("cluster ", clabel)
             if clabel == -1:   # the unmatched timestamps
