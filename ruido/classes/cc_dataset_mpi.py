@@ -447,11 +447,13 @@ class CCDataset(object):
 
         for i in range(nshare):
             tstamp = self.datafile["corr_windows"]["timestamps"][rank * nshare + ix_corr_min + i]
-            try:
+
+            if type(tstamp) in [np.float32, np.float64, float]:
+                timestamps[i] = tstamp
+            else:
                 tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
-            except IndexError:
-                pass
-            timestamps[i] = UTCDateTime(tstmp).timestamp
+                timestamps[i] = UTCDateTime(tstmp).timestamp
+        print(timestamps)
 
         # gather
         comm.Gather(partdata, alldatashare, root=0)
@@ -464,8 +466,13 @@ class CCDataset(object):
             for ixdata in range(ix_corr_max - rest, ix_corr_max):
                 alldata[ixdata] = self.datafile["corr_windows"]["data"][ixdata]
                 tstamp = self.datafile["corr_windows"]["timestamps"][ixdata]
-                tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
-                alltimestamps[ixdata] = UTCDateTime(tstmp).timestamp
+
+                if type(tstamp) in [np.float32, np.float64, float]:
+                    alltimestamps[ixdata] = tstamp
+                else:
+                    tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
+                    alltimestamps[ixdata] = UTCDateTime(tstmp).timestamp
+
             print("Read to memory from {} to {}".format(UTCDateTime(alltimestamps[0]),
                                                         UTCDateTime(alltimestamps[-1])))
             # remove windows where there are no data
@@ -476,7 +483,7 @@ class CCDataset(object):
             try:
                 if keep_duration != 0:
                     if keep_duration > 0:
-                        ixcut = np.argmin(((self.dataset[0].timestamps[-1] -
+                        ixcut = np.argmin(((self.dataset[0].max() -
                                             self.dataset[0].timestamps) -
                                             keep_duration) ** 2)
 
@@ -502,6 +509,24 @@ class CCDataset(object):
         # if rank == 0:
         #     assert np.all(self.dataset[0].data[0:3] == self.datafile["corr_windows"]["data"][0:3])
         #     assert np.all(self.dataset[0].data[10:13] == self.datafile["corr_windows"]["data"][10:13])
+
+    def special_stack_filt(self, ixs, frequency, window_frequency,
+                           type="lowpass", stacklevel_in=0, stacklevel_out=1):
+        if rank != 0:
+            raise ValueError("Call this function only on one process")
+        # filter in the other dimension (along observation windows)
+        newix = len(self.dataset) + 10
+        print(newix)
+        self.dataset[newix] = CCData(self.dataset[stacklevel_in].data[ixs, :].copy().T,
+                                     np.arange(len(ixs)) / window_frequency, window_frequency)
+        if type == "lowpass":
+            self.filter_data(filter_type=type, f_lp=frequency, stacklevel=newix)
+        elif type == "highpass":
+            self.filter_data(filter_type=type, f_hp=frequency, stacklevel=newix)
+
+        self.dataset[stacklevel_out] = CCData(self.dataset[newix].data.copy().T,
+                                              self.dataset[stacklevel_in].timestamps[ixs],
+                                              fs=self.dataset[stacklevel_in].fs)
 
     def stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1, overwrite=False,
               epsilon_robuststack=None):

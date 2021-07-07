@@ -7,13 +7,11 @@ from scipy.signal import sosfilt, sosfiltfilt, hann, tukey, fftconvolve
 from scipy.fftpack import next_fast_len
 from scipy.interpolate import interp1d
 from ruido.utils import filter
-import pandas as pd
 import os
 from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten, mwcs_dvv, robust_stack
 # from ruido.clustering import cluster, cluster_minibatch
 from obspy.signal.filter import envelope
 from obspy.signal.detrend import polynomial as obspolynomial
-from mpi4py import MPI
 from warnings import warn
 
 """
@@ -628,8 +626,12 @@ class CCDataset_serial(object):
 
             if tstamp == "":
                 continue
-            tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
-            timestamps[i - ix_corr_min] = UTCDateTime(tstmp).timestamp
+
+            if type(tstamp) == str:
+                tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
+                timestamps[i - ix_corr_min] = UTCDateTime(tstmp).timestamp
+            elif type(tstamp) in [np.float64, np.float32, float]:
+                timestamps[i - ix_corr_min] = tstamp
                 
 
         data = data[timestamps != 0.0]

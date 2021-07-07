@@ -19,7 +19,7 @@ except ImportError:
     print("cmcrameri is not installed.")
     print("Install it to use perceptually uniform scientific colormaps.")
 
-def add_stacks(dset, config, rank, t_running_in=None):
+def add_stacks(dset, config, rank):
 
     # make a difference whether there are cluster labels or not.
     # if there are then use them for selection.
@@ -30,15 +30,19 @@ def add_stacks(dset, config, rank, t_running_in=None):
     if dset.dataset[0].cluster_labels is not None:
 
         for clabel in np.unique(dset.dataset[0].cluster_labels):
+            if len(dset.dataset) > 1:
+                t_running = dset.dataset[clabel + 1].timestamps.max() + config["step"]
+            else:
+                t_running = max(config["t0"], dset.dataset[0].timestamps.min())
             # print("cluster ", clabel)
             if clabel == -1:   # the unmatched timestamps
                 warn("Unmatched timestamps present, is this ok?")
                 continue
 
-            if t_running_in is None:
-                t_running = max(config["t0"], dset.dataset[0].timestamps.min())
-            else:
-                t_running = t_running_in
+            # if t_running_in is None:
+            #     t_running = max(config["t0"], dset.dataset[0].timestamps.min())
+            # else:
+            #     t_running = t_running_in
 
             while t_running < min(config["t1"], dset.dataset[0].timestamps.max()):
 
@@ -62,10 +66,14 @@ def add_stacks(dset, config, rank, t_running_in=None):
                 t_running += config["step"]
 
     else:
-        if t_running_in is None:
-            t_running = max(config["t0"], dset.dataset[0].timestamps.min())
+        # if t_running_in is None:
+        #     t_running = max(config["t0"], dset.dataset[0].timestamps.min())
+        # else:
+        #     t_running = t_running_in
+        if len(dset.dataset) > 1:
+            t_running = dset.dataset[1].timestamps.max() + config["step"]
         else:
-            t_running = t_running_in
+            t_running = max(config["t0"], dset.dataset[0].timestamps.min())
 
         while t_running < min(config["t1"], dset.dataset[0].timestamps.max()):
             stimes = dset.dataset[0].group_for_stacking(t_running, duration=config["duration"])
@@ -134,7 +142,7 @@ def run_stacking(config, rank, size, comm):
                                     pass
                             else:
                                 dset.add_datafile(f)
-                                dset.data_to_memory(keep_duration=3 * config["duration"])
+                                dset.data_to_memory(keep_duration=config["duration"])
                                 if rank == 0 and config["use_clusters"]:
                                     dset.dataset[0].add_cluster_labels(clusters)
                                 else:
@@ -153,11 +161,11 @@ def run_stacking(config, rank, size, comm):
                                              filter_type=config["filt_type"], stacklevel=0,
                                              maxorder=config["filt_maxord"])
                             if rank == 0:
-                                try:
-                                    t_running = dset.dataset[1].timestamps.max() + config["step"]
-                                except KeyError:
-                                    t_running = max(dset.dataset[0].timestamps.min(), config["t0"])
-                                add_stacks(dset, config, t_running)
+                                # try:
+                                #     t_running = dset.dataset[1].timestamps.max() + config["step"]
+                                # except KeyError:
+                                #     t_running = max(dset.dataset[0].timestamps.min(), config["t0"])
+                                add_stacks(dset, config)
                                 print(dset)
                             else:
                                 pass

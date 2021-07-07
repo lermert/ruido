@@ -29,7 +29,7 @@ def run_clustering(config, rank, size, comm):
 
             # loop over components
             for ixch1, ch1 in enumerate(config["channels"]):
-                for ch2 in config["channels"][ixch1: ]:
+                for ch2 in config["channels"][ixch1:]:
                     channel_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
                     if channel_id in ids_done:
                         continue
@@ -63,7 +63,7 @@ def run_clustering(config, rank, size, comm):
                                                       min(config["n_samples_each_file"],
                                                       dset.dataset[0].ntraces))
                     elif config["n_samples_each_file"] == "all":
-                        ixs_random = range(dset.dataset[0].ntraces)
+                        ixs_random = np.arange(dset.dataset[0].ntraces)
                     dset.dataset[1] = CCData_serial(dset.dataset[0].data[ixs_random].copy(),
                                                     dset.dataset[0].timestamps[ixs_random].copy(),
                                                     dset.dataset[0].fs)
@@ -81,7 +81,7 @@ def run_clustering(config, rank, size, comm):
                                                           min(config["n_samples_each_file"],
                                                           dset.dataset[0].ntraces))
                         elif config["n_samples_each_file"] == "all":
-                            ixs_random = range(dset.dataset[0].ntraces)
+                            ixs_random = np.arange(dset.dataset[0].ntraces)
 
                         # create a new array
                         newdata = dset.dataset[0].data[ixs_random, :]
@@ -120,7 +120,7 @@ def run_clustering(config, rank, size, comm):
                         #window. The windows are all centered on lag 0 and extend to 10 / fmin
                         dset.dataset[2].window_data(t_mid=config["twin_mid"], hw=twin_hw,
                                          window_type="tukey", tukey_alpha=0.5,
-                                         cutout=True)
+                                         cutout=False)
 
                         # perform PCA on the random subset
                         dset.dataset[2].data = np.nan_to_num(dset.dataset[2].data)
