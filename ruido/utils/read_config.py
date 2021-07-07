@@ -60,8 +60,8 @@ tuples of fmin, fmax"
             pass
         # copy metadata
         t_now = UTCDateTime().strftime("%Y-%m-%dT%H.%M")
-        with open(os.path.join(dtry, "configfile_{}.yml".format(t_now)), "w") as coutf:
-            coutf.write(yaml.dump(config))
+        savedfile = os.path.join(dtry, "configfile_{}.yml".format(t_now))
+        os.system("cp {} {}".format(configfile, savedfile))
 
     # make sure station names are strings
     config["stations"] = [str(sta) for sta in config["stations"]]

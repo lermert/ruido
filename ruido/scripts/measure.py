@@ -51,7 +51,7 @@ def run_measure(config, rank, size, comm):
 
         station2 = os.path.basename(input_file.split(".")[4])
         ch1 = os.path.basename(input_file.split(".")[3][0: 3])
-        ch2 = os.path.basename(input_file.split(".")[4])
+        ch2 = os.path.basename(input_file.split(".")[6])
 
         ch_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
         if iinf == 0:
@@ -108,8 +108,10 @@ def run_measure(config, rank, size, comm):
             comm.Barrier()
             if rank == 0:
                 del dset.dataset[1]
-                del dset.dataset[2]
             else:
                 pass
-
-        
+    # at the end write all to file
+    if rank == 0:
+        outfile_name = "{}_{}_{}.csv".format(ch_id, config["measurement_type"],
+                                             config["reference_type"])
+        output.to_csv(os.path.join(config["msr_dir"], outfile_name))

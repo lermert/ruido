@@ -240,10 +240,11 @@ def measurement_trailing(dset, config, twin, freq_band, rank, comm,
     else:
         return([], [], [], [], [], [])
 
-def measurement_list(dset, config, twin, freq_band, rank, comm,
-                     stacklevel=1):
+def measurement_list(dset, config, twin, freq_band, rank, comm):
+    return_empty = False
+
     if rank == 0:
-        data = dset.dataset[stacklevel]
+        data = dset.dataset[1]
         if config["reference_type"] == "list":
             ntraces = data.ntraces
             nt = data.npts
@@ -254,8 +255,15 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
 
                 ixs_stack = dset.dataset[0].group_for_stacking(t0=r_window[0].timestamp,
                                                                duration=r_window[1].timestamp - r_window[0].timestamp)
-                dset.stack(ixs_stack, stacklevel_in=1, stacklevel_out=2)
-            references = dset.dataset[2].data
+                if len(ixs_stack) == 0:
+                    print("No windows found for the chosen reference period.")
+                else:
+                    dset.stack(ixs_stack, stacklevel_in=1, stacklevel_out=2)
+            if len(dset.dataset) == 3:
+                references = dset.dataset[2].data
+            else:
+                references = np.zeros(dset.dataset[1].npts)
+                return_empty = True
         elif config["reference_type"] == "bootstrap":
             ntraces = data.ntraces
             nt = data.npts
@@ -275,8 +283,9 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
                     if len(tstmps_bs) > 1:
                         tref = np.random.choice(tstmps_bs)
                     else:
-                        print("Useless case: only 1 stack.")
+                        print("Useless case: 1 or less windows found in chosen reference.")
                         print("{}-{}s, {}-{} Hz, {}".format(*twin, *freq_band, UTCDateTime(tstmps_bs[0])))
+                        return_empty = True
                         tref = tstmps_bs[0]
                     
                     if config["print_debug"]:
@@ -324,7 +333,7 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
         tags = np.zeros(ntraces)
 
         if rank > 0:
-            dset.dataset[stacklevel] = CCData(stacks, timestamps, fs)
+            dset.dataset[1] = CCData(stacks, timestamps, fs)
 
         else:
             pass
@@ -379,7 +388,7 @@ def measurement_list(dset, config, twin, freq_band, rank, comm,
         else:
             pass
 
-    if rank == 0:
+    if rank == 0 and not return_empty:
         return(np.array(t_list), np.array(dvv_list), np.array(cc0_list),
                np.array(cc1_list), np.array(err_list), np.array(tags_list))
     else:
