@@ -21,9 +21,11 @@ except ImportError:
 
 def add_stacks(dset, config, rank):
 
+    if rank != 0:
+        raise ValueError("serial function")
     # make a difference whether there are cluster labels or not.
     # if there are then use them for selection.
-    if len(dset.dataset) == 0 and rank == 0:
+    if len(dset.dataset) == 0:
         print("Nothing to stack. Call data_to_memory first")
         return()
 
@@ -165,7 +167,7 @@ def run_stacking(config, rank, size, comm):
                                 #     t_running = dset.dataset[1].timestamps.max() + config["step"]
                                 # except KeyError:
                                 #     t_running = max(dset.dataset[0].timestamps.min(), config["t0"])
-                                add_stacks(dset, config)
+                                add_stacks(dset, config, rank)
                                 print(dset)
                             else:
                                 pass
