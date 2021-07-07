@@ -154,7 +154,7 @@ def run_clustering(config, rank, size, comm):
                             # window
                             dset.dataset[0].window_data(t_mid=config["twin_mid"], hw=twin_hw,
                                              window_type="tukey", tukey_alpha=0.5,
-                                             cutout=True)
+                                             cutout=False)
                             dset.dataset[0].data = np.nan_to_num(dset.dataset[0].data)
                             X = StandardScaler().fit_transform(dset.dataset[0].data)
                             # expand the data in the principal component basis:

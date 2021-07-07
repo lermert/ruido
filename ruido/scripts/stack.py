@@ -123,6 +123,8 @@ def run_stacking(config, rank, size, comm):
                                                                                           ch2)))
                         if len(input_files) == 0:
                             continue
+                        # VERY IMPORTANT
+                        input_files.sort()
 
                         if config["use_clusters"]:
                             clusterfile = os.path.join(config["cluster_dir"],

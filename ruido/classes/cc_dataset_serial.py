@@ -55,7 +55,7 @@ class CCData_serial(object):
             self.timestamps = np.array([timestamps])
         else:
             self.timestamps = np.array(timestamps)
-        self.fs = fs        
+        self.fs = fs
         self.ntraces = self.data.shape[0]
         self.max_lag = (self.npts - 1) / 2 / self.fs
         self.lag = np.linspace(-self.max_lag, self.max_lag, self.npts)
@@ -601,7 +601,7 @@ class CCDataset_serial(object):
         # commit to a new dataset object or add it to existing
         fs = dict(self.datafile['stats'].attrs)['sampling_rate']
         npts = self.datafile['corr_windows']["data"][0].shape[0]
-        ntraces = len(np.where(self.datafile["corr_windows"]["timestamps"][:] != "")[0])
+        ntraces = len(self.datafile["corr_windows"]["timestamps"])
 
         if ix_corr_max is None:
             ix_corr_max = ntraces
@@ -627,11 +627,14 @@ class CCDataset_serial(object):
             if tstamp == "":
                 continue
 
-            if type(tstamp) == str:
-                tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
-                timestamps[i - ix_corr_min] = UTCDateTime(tstmp).timestamp
-            elif type(tstamp) in [np.float64, np.float32, float]:
+            if type(tstamp) in [np.float64, np.float32, float]:
                 timestamps[i - ix_corr_min] = tstamp
+            else:
+                try:
+                    tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
+                    timestamps[i - ix_corr_min] = UTCDateTime(tstmp).timestamp
+                except KeyError:
+                    pass   # will set a zero timestamp that will get dropped.
                 
 
         data = data[timestamps != 0.0]
