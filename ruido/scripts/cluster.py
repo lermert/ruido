@@ -41,11 +41,12 @@ def run_clustering(config, rank, size, comm):
                         continue
 
                     datafiles = glob(os.path.join(config["input_directories"],
-                                                  "*{}*{}*{}*{}.*windows.h5".format(station1,
+                                                  "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
                                                                           ch1,
                                                                           station2,
                                                                           ch2)))
                     if len(datafiles) == 0:
+                        print("No files found.")
                         continue
                     datafiles.sort()
 
@@ -100,6 +101,14 @@ def run_clustering(config, rank, size, comm):
                         # The selections may change depending on the frequency band.
                         fmin, fmax = freq_band
                         twin_hw = config["hw_factor"] / fmin
+                        
+                        # determine output and if this has been computed already
+                        outputfile = "{}.{}-{}.{}_{}-{}Hz.gmmlabels.npy".format(station1, ch1, station2, ch2,
+                                                                                fmin, fmax)
+                        if os.path.exists(outputfile):
+                            continue
+
+
                         # copy before filtering
                         dset.dataset[2] = CCData_serial(dset.dataset[1].data.copy(),
                                                         dset.dataset[1].timestamps.copy(),
@@ -150,11 +159,12 @@ def run_clustering(config, rank, size, comm):
                                                  freq_norm=fnorm)
                             # filter
                             dset.dataset[0].filter_data(filter_type=config["filt_type"],
-                                             f_hp=fmin, f_lp=fmax, maxorder=config["filt_maxord"])
+                                                        f_hp=fmin, f_lp=fmax,
+                                                        maxorder=config["filt_maxord"])
                             # window
                             dset.dataset[0].window_data(t_mid=config["twin_mid"], hw=twin_hw,
-                                             window_type="tukey", tukey_alpha=0.5,
-                                             cutout=False)
+                                                        window_type="tukey", tukey_alpha=0.5,
+                                                        cutout=False)
                             dset.dataset[0].data = np.nan_to_num(dset.dataset[0].data)
                             X = StandardScaler().fit_transform(dset.dataset[0].data)
                             # expand the data in the principal component basis:
@@ -170,9 +180,9 @@ def run_clustering(config, rank, size, comm):
                         gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(all_pccs, range_ncomps)
 
                         # save the cluster labels
-                        labels = np.zeros((2, len(all_timestamps)))
+                        labels = np.zeros((3, len(all_timestamps)))
                         labels[0] = all_timestamps
                         labels[1] = gmixfinPCA
-                        outputfile = "{}.{}-{}.{}_{}-{}Hz.gmmlabels.npy".format(station1, ch1, station2, ch2, fmin, fmax)
+                        labels[2] = np.max(probs, axis=1)
                         np.save(os.path.join(config["cluster_dir"], outputfile), labels)
     return()

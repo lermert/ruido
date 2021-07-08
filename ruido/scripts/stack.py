@@ -117,7 +117,7 @@ def run_stacking(config, rank, size, comm):
                         if ch1 == ch2 and config["drop_autocorrelations"]:
                             continue
                         input_files = glob(os.path.join(config["input_directories"],
-                                                        "*{}*{}*{}*{}.*windows.h5".format(station1,
+                                                        "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
                                                                                           ch1,
                                                                                           station2,
                                                                                           ch2)))
