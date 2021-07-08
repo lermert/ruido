@@ -262,7 +262,7 @@ def measurement_list(dset, config, twin, freq_band, rank, comm):
             if len(dset.dataset) == 3:
                 references = dset.dataset[2].data
             else:
-                references = np.zeros(dset.dataset[1].npts)
+                references = None
                 return_empty = True
         elif config["reference_type"] == "bootstrap":
             ntraces = data.ntraces
@@ -309,6 +309,10 @@ def measurement_list(dset, config, twin, freq_band, rank, comm):
         timestamps = None
         fs = 0
         ntraces = 0
+
+    return_empty = comm.bcast(return_empty, root=0)
+    if return_empty:
+        return([], [], [], [], [], [])
     references = comm.bcast(references, root=0)
     timestamps = comm.bcast(timestamps, root=0)
     stacks = comm.bcast(stacks, root=0)
@@ -388,7 +392,7 @@ def measurement_list(dset, config, twin, freq_band, rank, comm):
         else:
             pass
 
-    if rank == 0 and not return_empty:
+    if rank == 0:
         return(np.array(t_list), np.array(dvv_list), np.array(cc0_list),
                np.array(cc1_list), np.array(err_list), np.array(tags_list))
     else:
