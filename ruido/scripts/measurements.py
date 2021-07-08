@@ -341,7 +341,7 @@ def measurement_list(dset, config, twin, freq_band, rank, comm):
         for ix in range(rank, ntraces, size):
             dvvp, dvv_timestp, ccoeffp, \
                 best_ccoeffp, dvv_errorp, = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
-                                                 ref=ref, ngrid=config["ngrid"], stacklevel=stacklevel,
+                                                 ref=ref, ngrid=config["ngrid"], stacklevel=1,
                                                  method=config["measurement_type"], indices=[ix],
                                                  dvv_bound=config["maxdvv"],
                                                  )
