@@ -255,13 +255,10 @@ def measurement_list(dset, config, twin, freq_band, rank, comm):
 
                 ixs_stack = dset.dataset[0].group_for_stacking(t0=r_window[0].timestamp,
                                                                duration=r_window[1].timestamp - r_window[0].timestamp)
-                if len(ixs_stack) == 0:
-                    print("No windows found for the chosen reference period.")
-                else:
-                    dset.stack(ixs_stack, stacklevel_in=1, stacklevel_out=2)
-            if len(dset.dataset) == 3:
+                dset.stack(ixs_stack, stacklevel_in=1, stacklevel_out=2)
+            try:
                 references = dset.dataset[2].data
-            else:
+            except KeyError:
                 references = None
                 return_empty = True
         elif config["reference_type"] == "bootstrap":

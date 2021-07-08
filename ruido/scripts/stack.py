@@ -219,10 +219,6 @@ def run_stacking(config, rank, size, comm):
                                         stats.attrs[k] = v
 
                                 cwin.create_dataset("data", data=dset.dataset[stacklevel].data)
-
-                                dtp = h5py.string_dtype()
-                                cwin.create_dataset("timestamps", shape=dset.dataset[stacklevel].timestamps.shape, dtype=dtp)
-                                for ixttsp, tstmp in enumerate(dset.dataset[stacklevel].timestamps):
-                                    cwin["timestamps"][ixttsp] = UTCDateTime(tstmp).strftime("%Y.%j.%H.%M.%S")
+                                cwin.create_dataset("timestamps", data=dset.dataset[stacklevel].timestamps.flatten())
                                 outfile.flush()
                                 outfile.close()
