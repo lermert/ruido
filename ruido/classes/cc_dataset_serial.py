@@ -1,6 +1,6 @@
 import numpy as np
 import h5py
-from obspy import Trace, UTCDateTime
+from obspy import UTCDateTime
 from obspy.signal.invsim import cosine_taper
 import matplotlib.pyplot as plt
 from scipy.signal import sosfilt, sosfiltfilt, hann, tukey, fftconvolve
@@ -8,16 +8,17 @@ from scipy.fftpack import next_fast_len
 from scipy.interpolate import interp1d
 from ruido.utils import filter
 import os
-from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten, mwcs_dvv, robust_stack
+from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten,\
+    mwcs_dvv, robust_stack
 # from ruido.clustering import cluster, cluster_minibatch
 from obspy.signal.filter import envelope
 from obspy.signal.detrend import polynomial as obspolynomial
-from warnings import warn
 
 """
-Module for handling auto- or cross-correlation datasets as output by ants_2 python code.
+Module for handling auto- or cross-correlation datasets
+as output by ants_2 python code.
 """
-    
+
 class CCData_serial(object):
     """
     An object that holds an array of timestamps, an array of correlation data,
@@ -29,20 +30,23 @@ class CCData_serial(object):
     Attributes
     ----------
     :type data:  :class:`~numpy.ndarray`
-    :param data: 2-D data array where row is observation time and column is correlation lag 
+    :param data: 2-D data array where row is observation time,
+    and column is correlation lag
     :type timestamps: :class:`~numpy.ndarray`
-    :param timestamps: Array of POSIX timestamps output by obspy via ants_2 output
+    :param timestamps: Array of POSIX timestamps output by obspy via ants_2
     :type fs: float
     :param fs: Sampling rate in Hz
 
     Methods
     -------
-    remove_nan_segments(self): Remove traces that contain numpy NaNs for whatever reason
-    add_rms(self): Add an array containing the root mean square amplitude of each observation time
-    add_cluster_labels(self, clusters): Append labels from clustering file, double checking
-    consistent time stamps
-    align(self, t1, t2, ref, plot=False): Shift traces to maximize the correlation coefficient
-    of samples between lags t1 and t2, with respect to reference ref
+    remove_nan_segments(self): Remove traces that contain numpy NaNs
+    add_rms(self): Add an array containing the root mean square amplitude of
+    each observation time
+    add_cluster_labels(self, clusters): Append labels from clustering file,
+    double checking consistent time stamps
+    align(self, t1, t2, ref, plot=False): Shift traces to maximize the
+    correlation coefficient of samples between lags t1 and t2,
+    with respect to reference ref
 
     """
 
@@ -51,7 +55,7 @@ class CCData_serial(object):
         self.data = np.array(data)
         self.npts = self.data.shape[1]
         self.ntraces = self.data.shape[0]
-        if self.ntraces == 1:
+        if self.ntraces == 1 and np.ndim(timestamps) == 0:
             self.timestamps = np.array([timestamps])
         else:
             self.timestamps = np.array(timestamps)
@@ -71,17 +75,13 @@ class CCData_serial(object):
 
         self.data = self.data[ixfinite]
         ntraces_new = self.data.shape[0]
-        print("Removed {} of {} traces due to NaN values. Data gaps?".format(ntraces - ntraces_new, ntraces))
+        print("Removed {} of {} traces due to NaN values.".format(ntraces -
+            ntraces_new, ntraces))
         print("Dates of removed segments:")
         for t in self.timestamps[np.invert(ixfinite)]:
             print(UTCDateTime(t))
 
-        if len(ixfinite) > 1:
-            self.timestamps = self.timestamps[ixfinite]
-        elif len(ixfinite) == 1:
-            self.timestamps = np.array([self.timestamps[ixfinite]])
-        else:
-            self.timestamps = []
+        self.timestamps = self.timestamps[ixfinite]
         self.ntraces = ntraces_new
 
     def add_rms(self):
@@ -89,35 +89,36 @@ class CCData_serial(object):
         # (for selection)
         rms = np.zeros(self.ntraces)
 
-        if len(rms) == 0:
-            return
-
         for i, dat in enumerate(self.data):
             rms[i] = np.sqrt(((dat - dat.mean()) ** 2).mean())
             if np.isnan(rms[i]):
-                print(rms[i], i, dat.mean())
-                rms[i] = 1.0e4  # make the value large so that these windows get discarded
+                print("Nan during RMS: ", rms[i], i, dat.mean())
+                # make the value large so that these windows get discarded
+                rms[i] = 1.0e4
         self.rms = rms
 
     def add_cluster_labels(self, clusters):
 
-        if type(clusters) == str:
+        if type(clusters) != np.ndarray:
             c = np.load(clusters)
         else:
             c = clusters
         cl = []
         for tst in self.timestamps:
             try:
+                # this is slow but ensures consistency
+                # only done once
                 ix = np.where(c[0] == tst)[0][0]
                 cl.append(int(c[1, ix]))
             except IndexError:
                 cl.append(-1)
+        print("Nr of unmatched timestamps: ", len(cl[cl == -1]))
         self.cluster_labels = np.array(cl)
 
     def align(self, t1, t2, ref, plot=False):
         l0 = np.argmin((self.lag - t1) ** 2)
         l1 = np.argmin((self.lag - t2) ** 2)
-        
+
         taper = np.ones(self.lag.shape)
         taper[0: l0] = 0
         taper[l1:] = 0
@@ -130,19 +131,19 @@ class CCData_serial(object):
             cc = fftconvolve(test[::-1] / test.max(), ref / ref.max(), "full")
             cc = cc[ix0: ix1]
             shift = int(self.lag[np.argmax(cc)] * self.fs)
-            
+
             # apply the shift
             if shift == 0:
                 pass
             elif shift > 0:
-                self.data[i, shift: ] = self.data[i, : -shift].copy()
+                self.data[i, shift:] = self.data[i, : -shift].copy()
                 self.data[i, 0: shift] = 0
             else:
-                self.data[i, :shift ] = self.data[i, -shift:].copy()
+                self.data[i, :shift] = self.data[i, -shift:].copy()
                 self.data[i, shift:] = 0
 
     def data_to_envelope(self):
-        #replace stacks by their envelope
+        # replace stacks by their envelope
         newstacks = []
         for s in self.data:
             newstacks.append(envelope(s))
@@ -167,7 +168,6 @@ class CCData_serial(object):
 
         return(ixs[ixs_keep])
 
-
     def group_for_stacking(self, t0, duration, cluster_label=None):
         """
         Create a list of time stamps to be stacked
@@ -180,7 +180,7 @@ class CCData_serial(object):
         t_to_select = self.timestamps
 
         # find closest to t0 window
-        assert type(t0) in [float, np.float64], "t0 must be floating point time stamp"
+        assert type(t0) in [float, np.float64, np.float32], "t0 must be floating point time stamp"
 
         # find indices
         ixs_selected = np.intersect1d(np.where(t_to_select >= t0),
@@ -188,11 +188,12 @@ class CCData_serial(object):
 
         # check if selection to do for clusters
         if cluster_label is not None:
-            k_to_select = self.cluster_labels
-            if k_to_select is None:
+            if self.cluster_labels is None:
                 raise ValueError("Selection by cluster labels not possible: No labels assigned.")
-            ixs_selected = np.intersect1d(ixs_selected, np.where(k_to_select == cluster_label))
+            ixs_selected = np.intersect1d(ixs_selected,
+                                          np.where(self.cluster_labels == cluster_label))
 
+        print("grouped for stack: ", ixs_selected)
         return(ixs_selected)
 
     def select_for_stacking(self, ixs, selection_mode, cc=0.5,
@@ -244,6 +245,7 @@ class CCData_serial(object):
         else:
             raise NotImplementedError
 
+        print("selected for stack: ", ixs_selected)
         return(ixs_selected)
 
     def demean(self):
@@ -259,7 +261,7 @@ class CCData_serial(object):
 
     def filter_data(self, taper_perc=0.1, filter_type="bandpass",
                     f_hp=None, f_lp=None, corners=4, zerophase=True,
-                    maxorder=8, npool=1):
+                    maxorder=8):
 
         """
         Parallel filtering using scipy second order section filter
@@ -268,7 +270,7 @@ class CCData_serial(object):
         to_filter = self.data
         npts = self.npts
         fs = self.fs
-        
+
         # define taper to avoid high-freq. artefacts
         taper = cosine_taper(npts, taper_perc)
 
@@ -319,79 +321,79 @@ class CCData_serial(object):
             self.data = np.array(new_win_dat)
             self.npts = len(ix_to_keep)
 
-    def run_measurement(self, indices, to_measure, timestamps,
-                        ref, fs, lag, f0, f1, ngrid,
-                        dvv_bound, method="stretching"):
+    # def run_measurement(self, indices, to_measure, timestamps,
+    #                     ref, fs, lag, f0, f1, ngrid,
+    #                     dvv_bound, method="stretching"):
         
-        reference = ref.copy()
-        para = {}
-        para["dt"] = 1. / fs
-        para["twin"] = [lag[0], lag[-1] + 1. / fs]
-        para["freq"] = [f0, f1]
+    #     reference = ref.copy()
+    #     para = {}
+    #     para["dt"] = 1. / fs
+    #     para["twin"] = [lag[0], lag[-1] + 1. / fs]
+    #     para["freq"] = [f0, f1]
 
-        if indices is None:
-            indices = range(len(to_measure))
+    #     if indices is None:
+    #         indices = range(len(to_measure))
 
-        dvv_times = np.zeros(len(indices))
-        ccoeff = np.zeros(len(indices))
-        best_ccoeff = np.zeros(len(indices))
+    #     dvv_times = np.zeros(len(indices))
+    #     ccoeff = np.zeros(len(indices))
+    #     best_ccoeff = np.zeros(len(indices))
 
-        if method in ["stretching", "mwcs"]:
-            dvv = np.zeros((len(indices), 1))
-            dvv_error = np.zeros((len(indices), 1))
+    #     if method in ["stretching", "mwcs"]:
+    #         dvv = np.zeros((len(indices), 1))
+    #         dvv_error = np.zeros((len(indices), 1))
             
-        elif method in ["dtw"]:
-            if len_dtw_msr is None:
-                len_dtw_msr = []
-                testmsr = dtw_dvv(reference, reference,
-                              para, maxLag=maxlag_dtw,
-                              b=10, direction=1)
-                len_dtw_msr.append(len(testmsr[0]))
-                len_dtw_msr.append(testmsr[1].shape)
+    #     elif method in ["dtw"]:
+    #         if len_dtw_msr is None:
+    #             len_dtw_msr = []
+    #             testmsr = dtw_dvv(reference, reference,
+    #                           para, maxLag=maxlag_dtw,
+    #                           b=10, direction=1)
+    #             len_dtw_msr.append(len(testmsr[0]))
+    #             len_dtw_msr.append(testmsr[1].shape)
 
-            dvv = np.zeros((len(indices), len_dtw_msr[0]))
-            dvv_error = np.zeros((len(indices), *len_dtw_msr[1]))
-        else:
-            raise ValueError("Unknown measurement method {}.".format(method))
+    #         dvv = np.zeros((len(indices), len_dtw_msr[0]))
+    #         dvv_error = np.zeros((len(indices), *len_dtw_msr[1]))
+    #     else:
+    #         raise ValueError("Unknown measurement method {}.".format(method))
 
-        for i, tr in enumerate(to_measure):
-            if i not in indices:
-                dvv[cnt, :] = np.nan
-                dvv_times[cnt] = timestamps[i]
-                ccoeff[cnt] = np.nan
-                # print(ccoeff[cnt])
-                best_ccoeff[cnt] = np.nan
-                dvv_error[cnt, :] = np.nan
-                continue
+    #     for i, tr in enumerate(to_measure):
+    #         if i not in indices:
+    #             dvv[i, :] = np.nan
+    #             dvv_times[i] = timestamps[i]
+    #             ccoeff[i] = np.nan
+    #             # print(ccoeff[cnt])
+    #             best_ccoeff[i] = np.nan
+    #             dvv_error[i, :] = np.nan
+    #             continue
 
-            if method == "stretching":
-                dvvp, delta_dvvp, coeffp, cdpp = stretching_vect(reference, tr,
-                                                        dvv_bound, ngrid, para)
-            elif method == "dtw":
-                dvv_bound = int(dvv_bound)
-                warppath, dist,  coeffor, coeffshift = dtw_dvv(reference, tr,
-                                         para, maxLag=maxlag_dtw,
-                                         b=dvv_bound, direction=1)
-                coeffp = coeffshift
-                cdpp = coeffor
-                delta_dvvp = dist
-                dvvp = warppath
-            elif method == "mwcs":
-                ixsnonzero = np.where(reference != 0.0)
-                dvvp, errp = mwcs_dvv(reference[ixsnonzero],
-                                     tr[ixsnonzero],
-                                     moving_window_length,
-                                     moving_window_step, para)
-                delta_dvvp = errp
-                coeffp = np.nan
-                cdpp = np.nan
+    #         if method == "stretching":
+    #             dvvp, delta_dvvp, coeffp, cdpp = stretching_vect(reference, tr,
+    #                                                     dvv_bound, ngrid, para)
+    #         elif method == "dtw":
+    #             dvv_bound = int(dvv_bound)
+    #             warppath, dist,  coeffor, coeffshift = dtw_dvv(reference, tr,
+    #                                      para, maxLag=maxlag_dtw,
+    #                                      b=dvv_bound, direction=1)
+    #             coeffp = coeffshift
+    #             cdpp = coeffor
+    #             delta_dvvp = dist
+    #             dvvp = warppath
+    #         elif method == "mwcs":
+    #             ixsnonzero = np.where(reference != 0.0)
+    #             dvvp, errp = mwcs_dvv(reference[ixsnonzero],
+    #                                  tr[ixsnonzero],
+    #                                  moving_window_length,
+    #                                  moving_window_step, para)
+    #             delta_dvvp = errp
+    #             coeffp = np.nan
+    #             cdpp = np.nan
 
-            dvv[i, :] = dvvp
-            dvv_times[i] = timestamps[i]
-            ccoeff[i] = cdpp
-            best_ccoeff[i] = coeffp
-            dvv_error[i, :] = delta_dvvp
-        return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
+    #         dvv[i, :] = dvvp
+    #         dvv_times[i] = timestamps[i]
+    #         ccoeff[i] = cdpp
+    #         best_ccoeff[i] = coeffp
+    #         dvv_error[i, :] = delta_dvvp
+    #     return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
 
     def measure_dvv_ser(self, ref, f0, f1, method="stretching",
                         ngrid=90, dvv_bound=0.03,
@@ -400,9 +402,12 @@ class CCData_serial(object):
                         maxlag_dtw=0.0,
                         len_dtw_msr=None):
 
-        to_measure = self.data
+        if indices is None:
+            indices = np.arange(len(self.data))
+
+        to_measure = self.data[indices]
         lag = self.lag
-        timestamps = self.timestamps
+        timestamps = self.timestamps[indices]
         # print(timestamps)
         fs = self.fs
 
@@ -414,9 +419,6 @@ class CCData_serial(object):
         para["dt"] = 1. / fs
         para["twin"] = [lag[0], lag[-1] + 1. / fs]
         para["freq"] = [f0, f1]
-
-        if indices is None:
-            indices = range(len(to_measure))
 
         dvv_times = np.zeros(len(indices))
         ccoeff = np.zeros(len(indices))
@@ -439,11 +441,14 @@ class CCData_serial(object):
         else:
             raise ValueError("Unknown measurement method {}.".format(method))
 
-        cnt = 0
         for i, tr in enumerate(to_measure):
-            if i not in indices:
-                continue
+
             if np.any(np.isnan(tr)):
+                dvv[i, :] = np.nan
+                dvv_times[i] = timestamps[i]
+                ccoeff[i] = np.nan
+                best_ccoeff[i] = np.nan
+                dvv_error[i, :] = np.nan
                 continue
             if method == "stretching":
                 dvvp, delta_dvvp, coeffp, cdpp = stretching_vect(reference, tr,
@@ -469,12 +474,11 @@ class CCData_serial(object):
                 coeffp = np.nan
                 cdpp = np.nan
 
-            dvv[cnt, :] = dvvp
-            dvv_times[cnt] = timestamps[i]
-            ccoeff[cnt] = cdpp
-            best_ccoeff[cnt] = coeffp
-            dvv_error[cnt, :] = delta_dvvp
-            cnt += 1
+            dvv[i, :] = dvvp
+            dvv_times[i] = timestamps[i]
+            ccoeff[i] = cdpp
+            best_ccoeff[i] = coeffp
+            dvv_error[i, :] = delta_dvvp
         return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
 
 
@@ -600,7 +604,7 @@ class CCDataset_serial(object):
         # get fs, data, timestamps
         # commit to a new dataset object or add it to existing
         fs = dict(self.datafile['stats'].attrs)['sampling_rate']
-        npts = self.datafile['corr_windows']["data"][0].shape[0]
+        npts = self.datafile['corr_windows']["data"].shape[1]
         ntraces = len(self.datafile["corr_windows"]["timestamps"])
 
         if ix_corr_max is None:
@@ -616,7 +620,7 @@ class CCDataset_serial(object):
         except MemoryError:
             print("Data doesn't fit in memory, set a lower n_corr_max")
             return()
-        
+
         # allocate timestamps array
         timestamps = np.zeros(ix_corr_max - ix_corr_min)
         for i in range(ix_corr_min, ix_corr_max):  # , v in enumerate(self.datafile["corr_windows"]["data"][:]):
@@ -625,21 +629,23 @@ class CCDataset_serial(object):
             data[i - ix_corr_min, :] = v
 
             if tstamp == "":
+                # leave timestamp as 0, will get dropped
                 continue
 
             if type(tstamp) in [np.float64, np.float32, float]:
+                print("Float timestamps.")
                 timestamps[i - ix_corr_min] = tstamp
             else:
                 try:
                     tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
                     timestamps[i - ix_corr_min] = UTCDateTime(tstmp).timestamp
                 except KeyError:
-                    pass   # will set a zero timestamp that will get dropped.
-                
+                    # leave timestamp as 0, will get dropped
+                    pass
 
         data = data[timestamps != 0.0]
         timestamps = timestamps[timestamps != 0.0]
-       
+
         if normalize:
             # absolute last-resort-I-cannot-reprocess way to deal with amplitude issues
             for tr in data:
@@ -647,15 +653,13 @@ class CCDataset_serial(object):
 
 
         if len(timestamps) > 0:
-            print("Read to memory from {} to {}".format(UTCDateTime(timestamps[0]),
-                                                        UTCDateTime(timestamps[-1])))
 
             try:
                 if keep_duration != 0:
                     if keep_duration > 0:
                         ixcut = np.argmin(((self.dataset[0].timestamps[-1] -
                                             self.dataset[0].timestamps) -
-                                            keep_duration) ** 2)
+                                           keep_duration) ** 2)
 
                     else:  # keep all if negative keep_duration
                         ixcut = 0
@@ -672,18 +676,24 @@ class CCDataset_serial(object):
             self.dataset[0].add_rms()
             self.dataset[0].remove_nan_segments()
             self.dataset[0].median = np.nanmedian(self.dataset[0].data, axis=0)
+            # sort -- ants sometimes has weird little back jumps to deal with gaps
+            ixs_time = np.argsort(self.dataset[0].timestamps)
+            self.dataset[0].data = self.dataset[0].data[ixs_time, :]
+            self.dataset[0].timestamps = self.dataset[0].timestamps[ixs_time]
+            print("Read to memory from {} to {}".format(UTCDateTime(timestamps[0]),
+                                                        UTCDateTime(timestamps[-1])))
         else:
             self.dataset = {}
 
 
-    def stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1, overwrite=False,
+    def stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1,
               epsilon_robuststack=None):
         #stack
         if len(ixs) == 0:
             return()
 
         to_stack = self.dataset[stacklevel_in].data
-        t_to_stack = self.dataset[stacklevel_in].timestamps.copy()
+        t_to_stack = self.dataset[stacklevel_in].timestamps
 
         if stackmode == "linear":
             s = to_stack[ixs].sum(axis=0).copy()
@@ -705,9 +715,9 @@ class CCDataset_serial(object):
 
         except KeyError:
             self.dataset[stacklevel_out] = CCData_serial(np.array(newstacks, ndmin=2), newt, self.dataset[stacklevel_in].fs)
-            print(self.dataset[stacklevel_out].data.shape)
         
         self.dataset[stacklevel_out].ntraces = self.dataset[stacklevel_out].data.shape[0]
+        self.dataset[stacklevel_out].npts = self.dataset[stacklevel_out].data.shape[1]
 
     def plot_stacks(self, stacklevel=1, outfile=None, seconds_to_show=20, scale_factor_plotting=0.1,
                     plot_mode="heatmap", seconds_to_start=0.0, cmap=plt.cm.bone,
@@ -740,7 +750,7 @@ class CCDataset_serial(object):
         else:
             ax1 = ax
 
-        if plot_mode == "traces":            
+        if plot_mode == "traces":
             cnt = 0
             for i, tr in enumerate(to_plot):
 

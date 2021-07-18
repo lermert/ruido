@@ -4,7 +4,6 @@ import numpy as np
 from ruido.classes.cc_dataset_serial import CCDataset_serial, CCData_serial
 import os
 from glob import glob
-from obspy import UTCDateTime
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # read input
@@ -15,13 +14,10 @@ def run_clustering(config, rank, size, comm):
         print("Running clustering.")
         print("*"*80)
 
-    # if rank >= len(config["stations"]):
-    #     if config["print_debug"]:
-    #         print("Rank {} has nothing to do, exiting.".format(rank))
-    #     return()
-
     # loop over stations
     ids_done = []
+
+    # parallelism: Distribute by input station list
     for station1 in config["stations"][rank::size]:
         for station2 in config["stations"][rank::size]:
             if config["print_debug"]:
@@ -29,7 +25,8 @@ def run_clustering(config, rank, size, comm):
 
             # loop over components
             for ixch1, ch1 in enumerate(config["channels"]):
-                for ch2 in config["channels"][ixch1:]:
+                for ch2 in config["channels"]:
+                    # keep track of channels that were already done
                     channel_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
                     if channel_id in ids_done:
                         continue
@@ -37,9 +34,11 @@ def run_clustering(config, rank, size, comm):
                         ids_done.append(channel_id)
                         if config["print_debug"]:
                             print("Rank {} clustering ".format(rank), channel_id)
+                    # check if this is an autocorrelation and if yes, continue if drop_autocorrelations is true
                     if config["drop_autocorrelations"] and ch1 == ch2:
                         continue
 
+                    # find input files by glob
                     datafiles = glob(os.path.join(config["input_directories"],
                                                   "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
                                                                           ch1,
@@ -53,29 +52,32 @@ def run_clustering(config, rank, size, comm):
                     if config["print_debug"]:
                         print(datafiles)
 
-                    dset = CCDataset_serial(datafiles[0])
-                    dset.data_to_memory()
+                    # # start out the clustering with the very first dataset
+                    # dset = CCDataset_serial(datafiles[0])
+                    # dset.data_to_memory()
 
-                    # select a random subset of traces for PCA
-                    # here we use dataset key 0 for the raw data read in from each file
-                    # to retain all the randomly selected windows, we copy them to key 1
-                    if type(config["n_samples_each_file"]) == int:
-                        ixs_random = np.random.choice(np.arange(dset.dataset[0].ntraces),
-                                                      min(config["n_samples_each_file"],
-                                                      dset.dataset[0].ntraces))
-                    elif config["n_samples_each_file"] == "all":
-                        ixs_random = np.arange(dset.dataset[0].ntraces)
-                    dset.dataset[1] = CCData_serial(dset.dataset[0].data[ixs_random].copy(),
-                                                    dset.dataset[0].timestamps[ixs_random].copy(),
-                                                    dset.dataset[0].fs)
+                    # # select a random subset of traces for PCA
+                    # # here we use dataset key 0 for the raw data read in from each file
+                    # # to retain all the randomly selected windows, we copy them to key 1
+                    # if type(config["n_samples_each_file"]) == int:
+                    #     ixs_random = np.random.choice(np.arange(dset.dataset[0].ntraces),
+                    #                                   min(config["n_samples_each_file"],
+                    #                                   dset.dataset[0].ntraces))
+                    # elif config["n_samples_each_file"] == "all":
+                    #     ixs_random = np.arange(dset.dataset[0].ntraces)
+                    # dset.dataset[1] = CCData_serial(dset.dataset[0].data[ixs_random].copy(),
+                    #                                 dset.dataset[0].timestamps[ixs_random].copy(),
+                    #                                 dset.dataset[0].fs)
 
                     for ixfile, dfile in enumerate(datafiles):
                         if ixfile == 0:
-                            # we've been here already
-                            continue
-                        # read the data in
-                        dset.add_datafile(dfile)
-                        dset.data_to_memory(keep_duration=0)
+                            # set up the dataset for the first time
+                            dset = CCDataset_serial(dfile)
+                            dset.data_to_memory()
+                        else:
+                            # read the data in
+                            dset.add_datafile(dfile)
+                            dset.data_to_memory(keep_duration=0)
                         # use a random subset of each file (unless "all" requested)
                         if type(config["n_samples_each_file"]) == int:
                             ixs_random = np.random.choice(np.arange(dset.dataset[0].ntraces),
@@ -83,19 +85,29 @@ def run_clustering(config, rank, size, comm):
                                                           dset.dataset[0].ntraces))
                         elif config["n_samples_each_file"] == "all":
                             ixs_random = np.arange(dset.dataset[0].ntraces)
-
-                        # create a new array
-                        newdata = dset.dataset[0].data[ixs_random, :]
-                        assert (newdata.base is not dset.dataset[0].data)
-
-                        # keep the randomly selected windows under key 1, adding to the previously selected ones
-                        dset.dataset[1].data = np.concatenate((dset.dataset[1].data,
-                                                              newdata))
-                        dset.dataset[1].timestamps = np.concatenate((dset.dataset[1].timestamps,
-                                                                     dset.dataset[0].timestamps[ixs_random]))
-                        dset.dataset[1].ntraces = dset.dataset[1].data.shape[0]
+                        else:
+                            raise ValueError("n_samples_each_file must be an integer or \"all\".")
 
 
+                        if ixfile == 0:
+                            # create dataset on level 1
+                            dset.dataset[1] = CCData_serial(dset.dataset[0].data[ixs_random].copy(),
+                                                            dset.dataset[0].timestamps[ixs_random].copy(),
+                                                            dset.dataset[0].fs)
+                        else:
+                            # keep the randomly selected windows under key 1, 
+                            # adding to the previously selected ones
+                            dset.dataset[1].data = np.concatenate((dset.dataset[1].data,
+                                                                   dset.dataset[0].data[ixs_random].copy()))
+                            dset.dataset[1].timestamps = np.concatenate((dset.dataset[1].timestamps,
+                                                                         dset.dataset[0].timestamps[ixs_random].copy()))
+                            dset.dataset[1].ntraces = dset.dataset[1].data.shape[0]
+
+                    # now we have collected the randomly selected traces from all files to run the PCA on
+                    if config["print_debug"]:
+                        print(dset)
+
+                    # loop over frequency bands
                     for freq_band in config["freq_bands"]:
                         # The clustering is performed separately in different frequency bands.
                         # The selections may change depending on the frequency band.
@@ -105,7 +117,9 @@ def run_clustering(config, rank, size, comm):
                         # determine output and if this has been computed already
                         outputfile = "{}.{}-{}.{}_{}-{}Hz.gmmlabels.npy".format(station1, ch1, station2, ch2,
                                                                                 fmin, fmax)
-                        if os.path.exists(outputfile):
+                        if os.path.exists(os.path.join(config["cluster_dir"], outputfile)):
+                            if config["print_debug"]:
+                                print("File {} has already been computed, continuing...".format(outputfile))
                             continue
 
 
@@ -132,6 +146,9 @@ def run_clustering(config, rank, size, comm):
                                          cutout=False)
 
                         # perform PCA on the random subset
+                        # check if there are nans
+                        if config["print_debug"]:
+                            print("Are there nans? {}".format({1:"yes", 0:"no"}[np.any(np.isnan(dset.dataset[2].data))]))
                         dset.dataset[2].data = np.nan_to_num(dset.dataset[2].data)
                         X = StandardScaler().fit_transform(dset.dataset[2].data)
                         pca_rand = run_pca(X, min_cumul_var_perc=config["expl_var"])

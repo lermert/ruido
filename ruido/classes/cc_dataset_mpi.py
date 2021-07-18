@@ -1,15 +1,15 @@
 import numpy as np
 import h5py
-from obspy import Trace, UTCDateTime
+from obspy import UTCDateTime
 from obspy.signal.invsim import cosine_taper
 import matplotlib.pyplot as plt
 from scipy.signal import sosfilt, sosfiltfilt, hann, tukey, fftconvolve
 from scipy.fftpack import next_fast_len
 from scipy.interpolate import interp1d
 from ruido.utils import filter
-import pandas as pd
 import os
-from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten, mwcs_dvv, robust_stack
+from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten,\
+    mwcs_dvv, robust_stack
 # from ruido.clustering import cluster, cluster_minibatch
 from obspy.signal.filter import envelope
 from obspy.signal.detrend import polynomial as obspolynomial
@@ -65,12 +65,11 @@ class CCData(object):
         self.data = np.array(data)
         self.npts = self.data.shape[1]
         self.ntraces = self.data.shape[0]
-        if self.ntraces == 1:
+        if self.ntraces == 1 and np.ndim(timestamps) == 0:
             self.timestamps = np.array([timestamps])
         else:
             self.timestamps = np.array(timestamps)
-        self.fs = fs        
-        self.ntraces = self.data.shape[0]
+        self.fs = fs
         self.max_lag = (self.npts - 1) / 2 / self.fs
         self.lag = np.linspace(-self.max_lag, self.max_lag, self.npts)
         self.cluster_labels = None
@@ -78,33 +77,24 @@ class CCData(object):
         self.median = np.nanmedian(self.data, axis=0)
 
     def remove_nan_segments(self):
-        ntraces = self.data.shape[0]
         ixfinite = np.isfinite(self.data.sum(axis=1))
-        if ixfinite.sum() == ntraces:
+        if ixfinite.sum() == self.ntraces:
             return()
 
         self.data = self.data[ixfinite]
         ntraces_new = self.data.shape[0]
-        print("Removed {} of {} traces due to NaN values. Data gaps?".format(ntraces - ntraces_new, ntraces))
+        print("Removed {} of {} traces due to NaN values.".format(self.ntraces - ntraces_new, ntraces))
         print("Dates of removed segments:")
         for t in self.timestamps[np.invert(ixfinite)]:
             print(UTCDateTime(t))
 
-        if len(ixfinite) > 1:
-            self.timestamps = self.timestamps[ixfinite]
-        elif len(ixfinite) == 1:
-            self.timestamps = np.array([self.timestamps[ixfinite]])
-        else:
-            self.timestamps = []
+        self.timestamps = self.timestamps[ixfinite]
         self.ntraces = ntraces_new
 
     def add_rms(self):
         # add root mean square of raw cross-correlation windows
         # (for selection)
         rms = np.zeros(self.ntraces)
-
-        if len(rms) == 0:
-            return
 
         for i, dat in enumerate(self.data):
             rms[i] = np.sqrt(((dat - dat.mean()) ** 2).mean())
@@ -120,17 +110,21 @@ class CCData(object):
             c = clusters
         cl = []
         for tst in self.timestamps:
+            print(tst)
             try:
+                # this is slow but ensures consistency
+                # only done once
                 ix = np.where(c[0] == tst)[0][0]
                 cl.append(int(c[1, ix]))
             except IndexError:
                 cl.append(-1)
+        print("Nr of unmatched timestamps: ", len([cli for cli in cl if cl == -1]))
         self.cluster_labels = np.array(cl)
 
     def align(self, t1, t2, ref, plot=False):
         l0 = np.argmin((self.lag - t1) ** 2)
         l1 = np.argmin((self.lag - t2) ** 2)
-        
+
         taper = np.ones(self.lag.shape)
         taper[0: l0] = 0
         taper[l1:] = 0
@@ -143,7 +137,7 @@ class CCData(object):
             cc = fftconvolve(test[::-1] / test.max(), ref / ref.max(), "full")
             cc = cc[ix0: ix1]
             shift = int(self.lag[np.argmax(cc)] * self.fs)
-            
+
             # apply the shift
             if shift == 0:
                 pass
@@ -207,10 +201,9 @@ class CCData(object):
 
         # check if selection to do for clusters
         if cluster_label is not None:
-            k_to_select = self.cluster_labels
-            if k_to_select is None:
+            if self.cluster_labels is None:
                 raise ValueError("Selection by cluster labels not possible: No labels assigned.")
-            ixs_selected = np.intersect1d(ixs_selected, np.where(k_to_select == cluster_label))
+            ixs_selected = np.intersect1d(ixs_selected, np.where(self.cluster_labels == cluster_label))
 
         return(ixs_selected)
 
@@ -266,6 +259,7 @@ class CCData(object):
         else:
             raise NotImplementedError
 
+        print("selected for stack: ", ixs_selected)
         return(ixs_selected)
 
     def demean(self):
@@ -303,7 +297,7 @@ class CCData(object):
         else:
             new_win_dat = []
             for ix in range(to_window.shape[0]):
-                ix_to_keep = np.where(win > 0.0)[0]
+                ix_to_keep = np.where(win > 0.0)
                 new_win_dat.append(to_window[ix, ix_to_keep])
             newlag = self.lag[ix_to_keep]
             self.lag = newlag
@@ -411,8 +405,8 @@ class CCDataset(object):
         :param normalize: normalize each trace by its maximum or not
         """
         fs = dict(self.datafile['stats'].attrs)['sampling_rate']
-        npts = self.datafile['corr_windows']["data"][0].shape[0]
-        ntraces = len(np.where(self.datafile["corr_windows"]["timestamps"])[0])
+        npts = self.datafile['corr_windows']["data"].shape[1]
+        ntraces = len(self.datafile["corr_windows"]["timestamps"])
 
         if ix_corr_max is None:
             ix_corr_max = ntraces
@@ -447,13 +441,16 @@ class CCDataset(object):
 
         for i in range(nshare):
             tstamp = self.datafile["corr_windows"]["timestamps"][rank * nshare + ix_corr_min + i]
-
             if type(tstamp) in [np.float32, np.float64, float]:
                 timestamps[i] = tstamp
             else:
-                tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
+                if tstamp == "":
+                    tstmp = 0
+                else:
+                    tstmp = ",".join(tstamp.split('.')[0: 5])
                 timestamps[i] = UTCDateTime(tstmp).timestamp
-        print(timestamps)
+
+        comm.Barrier()
 
         # gather
         comm.Gather(partdata, alldatashare, root=0)
@@ -470,22 +467,27 @@ class CCDataset(object):
                 if type(tstamp) in [np.float32, np.float64, float]:
                     alltimestamps[ixdata] = tstamp
                 else:
-                    tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
+                    if tstamp == "":
+                        tstmp = 0
+                    else:
+                        tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
                     alltimestamps[ixdata] = UTCDateTime(tstmp).timestamp
 
             print("Read to memory from {} to {}".format(UTCDateTime(alltimestamps[0]),
                                                         UTCDateTime(alltimestamps[-1])))
             # remove windows where there are no data
-            ixs_nonzero = np.where(alltimestamps > 0.0)[0]
-            alldata = alldata[ixs_nonzero, :]
+            print("data shape before dropping 0 timestamps: ", alldata.shape)
+            ixs_nonzero = np.where(alltimestamps > 0.0)
+            alldata = alldata[ixs_nonzero]
             alltimestamps = alltimestamps[ixs_nonzero]
+            print("data shape after dropping 0 timestamps: ", alldata.shape)
 
             try:
                 if keep_duration != 0:
                     if keep_duration > 0:
                         ixcut = np.argmin(((self.dataset[0].timestamps.max() -
                                             self.dataset[0].timestamps) -
-                                            keep_duration) ** 2)
+                                           keep_duration) ** 2)
 
                     else:  # keep all if negative keep_duration
                         ixcut = 0
@@ -502,7 +504,14 @@ class CCDataset(object):
             self.dataset[0].add_rms()
             self.dataset[0].remove_nan_segments()
             self.dataset[0].median = np.nanmedian(self.dataset[0].data, axis=0)
+
+            # sort -- ants sometimes has weird little back jumps to deal with gaps
+            ixs_time = np.argsort(self.dataset[0].timestamps)
+            self.dataset[0].data = self.dataset[0].data[ixs_time, :]
+            self.dataset[0].timestamps = self.dataset[0].timestamps[ixs_time]
+            print("data to memory, rank0")
         else:
+            print("data to memory, nonzero rank")
             self.dataset = {}
 
         # only debugging
@@ -510,23 +519,23 @@ class CCDataset(object):
         #     assert np.all(self.dataset[0].data[0:3] == self.datafile["corr_windows"]["data"][0:3])
         #     assert np.all(self.dataset[0].data[10:13] == self.datafile["corr_windows"]["data"][10:13])
 
-    def special_stack_filt(self, ixs, frequency, window_frequency,
-                           type="lowpass", stacklevel_in=0, stacklevel_out=1):
-        if rank != 0:
-            raise ValueError("Call this function only on one process")
-        # filter in the other dimension (along observation windows)
-        newix = len(self.dataset) + 10
-        print(newix)
-        self.dataset[newix] = CCData(self.dataset[stacklevel_in].data[ixs, :].copy().T,
-                                     np.arange(len(ixs)) / window_frequency, window_frequency)
-        if type == "lowpass":
-            self.filter_data(filter_type=type, f_lp=frequency, stacklevel=newix)
-        elif type == "highpass":
-            self.filter_data(filter_type=type, f_hp=frequency, stacklevel=newix)
+    # def special_stack_filt(self, ixs, frequency, window_frequency,
+    #                        type="lowpass", stacklevel_in=0, stacklevel_out=1):
+    #     if rank != 0:
+    #         raise ValueError("Call this function only on one process")
+    #     # filter in the other dimension (along observation windows)
+    #     newix = len(self.dataset) + 10
+    #     print(newix)
+    #     self.dataset[newix] = CCData(self.dataset[stacklevel_in].data[ixs, :].copy().T,
+    #                                  np.arange(len(ixs)) / window_frequency, window_frequency)
+    #     if type == "lowpass":
+    #         self.filter_data(filter_type=type, f_lp=frequency, stacklevel=newix)
+    #     elif type == "highpass":
+    #         self.filter_data(filter_type=type, f_hp=frequency, stacklevel=newix)
 
-        self.dataset[stacklevel_out] = CCData(self.dataset[newix].data.copy().T,
-                                              self.dataset[stacklevel_in].timestamps[ixs],
-                                              fs=self.dataset[stacklevel_in].fs)
+    #     self.dataset[stacklevel_out] = CCData(self.dataset[newix].data.copy().T,
+    #                                           self.dataset[stacklevel_in].timestamps[ixs],
+    #                                           fs=self.dataset[stacklevel_in].fs)
 
     def stack(self, ixs, stackmode="linear", stacklevel_in=0, stacklevel_out=1, overwrite=False,
               epsilon_robuststack=None):
@@ -538,10 +547,10 @@ class CCDataset(object):
             raise ValueError("Call this function only on one process")
 
         to_stack = self.dataset[stacklevel_in].data
-        t_to_stack = self.dataset[stacklevel_in].timestamps.copy()
+        t_to_stack = self.dataset[stacklevel_in].timestamps
 
         if stackmode == "linear":
-            s = to_stack[ixs].sum(axis=0).copy()
+            s = to_stack[ixs].sum(axis=0)
             newstacks = s / len(ixs)
             newt = t_to_stack[ixs[0]]
         elif stackmode == "median":
@@ -566,7 +575,7 @@ class CCDataset(object):
     def run_measurement(self, indices, to_measure, timestamps,
                         ref, fs, lag, f0, f1, ngrid,
                         dvv_bound, method="stretching"):
-        
+
         reference = ref.copy()
         para = {}
         para["dt"] = 1. / fs
@@ -598,14 +607,9 @@ class CCDataset(object):
         else:
             raise ValueError("Unknown measurement method {}.".format(method))
 
+        cnt = 0
         for i, tr in enumerate(to_measure):
             if i not in indices:
-                dvv[cnt, :] = np.nan
-                dvv_times[cnt] = timestamps[i]
-                ccoeff[cnt] = np.nan
-                # print(ccoeff[cnt])
-                best_ccoeff[cnt] = np.nan
-                dvv_error[cnt, :] = np.nan
                 continue
 
             if method == "stretching":
@@ -630,11 +634,12 @@ class CCDataset(object):
                 coeffp = np.nan
                 cdpp = np.nan
 
-            dvv[i, :] = dvvp
-            dvv_times[i] = timestamps[i]
-            ccoeff[i] = cdpp
-            best_ccoeff[i] = coeffp
-            dvv_error[i, :] = delta_dvvp
+            dvv[cnt, :] = dvvp
+            dvv_times[cnt] = timestamps[i]
+            ccoeff[cnt] = cdpp
+            best_ccoeff[cnt] = coeffp
+            dvv_error[cnt, :] = delta_dvvp
+            cnt += 1
         return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
 
     def measure_dvv_par(self, ref, f0, f1, stacklevel=1, method="stretching",
@@ -691,8 +696,8 @@ run measure_dvv_ser on one process.")
 
         dvv, dvv_times, ccoeff, best_ccoeff, dvv_error = \
         self.run_measurement(indices, to_measure_part, timestamps_part,
-                             ref, fs, lag, f0, f1, ngrid,
-                             dvv_bound, method="stretching")
+                             ref=ref, fs=fs, lag=lag, f0=f0, f1=f1, ngrid=ngrid,
+                             dvv_bound=dvv_bound, method=method)
 
         comm.Gather(dvv, dvv_all[0: ndata - nrest], root=0)
         comm.Gather(dvv_times, timestamps_all[: ndata - nrest], root=0)
@@ -701,6 +706,7 @@ run measure_dvv_ser on one process.")
         comm.Gather(best_ccoeff, best_ccoeff_all[: ndata - nrest], root=0)
 
         if rank == 0:
+            print(dvv_times)
             #print(dvv_all.shape)
             #print(ndata)
             #print(nrest)
@@ -709,10 +715,13 @@ run measure_dvv_ser on one process.")
                 timestamps_extra = self.dataset[stacklevel].timestamps[ndata - nrest:]
                 if indices is None:
                     indices = range(len(to_measure_extra))
+                else:
+                    indices -= (ndata-nrest)
+                    indices = indices[indices > 0]
                 dvv, dvv_times, ccoeff, best_ccoeff, dvv_error = \
                 self.run_measurement(indices, to_measure_extra, timestamps_extra,
                                      ref, fs, lag, f0, f1, ngrid,
-                                     dvv_bound, method="stretching")
+                                     dvv_bound, method=method)
               
                 dvv_all[ndata - nrest:, :] = dvv
                 timestamps_all[ndata - nrest:, 0] = dvv_times
@@ -763,7 +772,7 @@ run measure_dvv_ser on one process.")
         if method in ["stretching", "mwcs"]:
             dvv = np.zeros((len(indices), 1))
             dvv_error = np.zeros((len(indices), 1))
-        elif method in ["dtw"]:
+        elif method == "dtw":
             if len_dtw_msr is None:
                 len_dtw_msr = []
                 testmsr = dtw_dvv(reference, reference,
@@ -901,7 +910,7 @@ run measure_dvv_ser on one process.")
     def post_whiten(self, f1, f2, stacklevel=0, npts_smooth=5, freq_norm="rma"):
 
         if rank == 0:
-            nfft = int(next_fast_len(self.dataset[stacklevel].npts))
+            nfft = int(next_fast_len(2 * self.dataset[stacklevel].npts))
             td_taper = cosine_taper(self.dataset[stacklevel].npts, 0.1)
             ndata = len(self.dataset[stacklevel].data)
             nshare = ndata // size
@@ -1072,7 +1081,7 @@ run measure_dvv_ser on one process.")
                 t_to_plot_all = np.arange(tstamp0, tstamp1 + step, step=step)
                 dat_mat = np.zeros((len(t_to_plot_all), self.dataset[stacklevel].npts))
                 dat_mat[:, :] = np.nan
-        
+
                 for ix, tr in enumerate(to_plot):
                     t = t_to_plot[ix]
                     ix_t = np.argmin(np.abs(t_to_plot_all - t))

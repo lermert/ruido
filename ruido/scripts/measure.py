@@ -1,16 +1,9 @@
 from ruido.classes.cc_dataset_mpi import CCDataset, CCData
 from ruido.scripts.measurements import run_measurement
-from ruido.utils.read_config import read_config
-from obspy import UTCDateTime
 import os
 import numpy as np
 import pandas as pd
-import time
 from glob import glob
-import re
-import yaml
-import io
-import sys
 
 
 def run_measure(config, rank, size, comm):
@@ -28,17 +21,19 @@ def run_measure(config, rank, size, comm):
         print(input_files)
 
     if len(input_files) == 0:
-        if config["print_debug"]:
-            print("No input files found.")
+        print("No input files found.\
+Check if order of channels in config files matches order of channels on filenames.")
         return()
 
 
     # For each input file:
+    # check if we are looking at another channel pair than before, if so: write output
+    # and start a new output table.
     # Read in the stacks
-    # For each time window:
-    # measurement
-    # save the result
-    # set up the dataframe to collect the results
+        # For each time window:
+        # measurement
+        # save the result
+        # set up the dataframe to collect the results
     output = pd.DataFrame(columns=["timestamps", "t0_s", "t1_s", "f0_Hz",  "f1_Hz",
                                    "tag", "dvv_max", "dvv", "cc_before", "cc_after",
                                    "dvv_err", "cluster"])
@@ -48,7 +43,6 @@ def run_measure(config, rank, size, comm):
         if config["use_clusters"]:
             cl_label = int(os.path.splitext(input_file)[0].split("_")[-1][2:])
         station1 = os.path.basename(input_file.split(".")[1])
-
         station2 = os.path.basename(input_file.split(".")[4])
         ch1 = os.path.basename(input_file.split(".")[3][0: 3])
         ch2 = os.path.basename(input_file.split(".")[6])
@@ -58,14 +52,17 @@ def run_measure(config, rank, size, comm):
             ch_id_prev = ch_id
 
         if ch_id != ch_id_prev:
-            # at the end write all to file
+            # if this is a new channel, write all to file,
+            # and start a fresh output table
             if rank == 0:
                 outfile_name = "{}_{}_{}.csv".format(ch_id, config["measurement_type"],
                                                      config["reference_type"])
                 output.to_csv(os.path.join(config["msr_dir"], outfile_name))
+                output = pd.DataFrame(columns=["timestamps", "t0_s", "t1_s", "f0_Hz",  "f1_Hz",
+                                               "tag", "dvv_max", "dvv", "cc_before", "cc_after",
+                                               "dvv_err", "cluster"])
             ch_id_prev = ch_id
 
-        
         freq_band = config["freq_bands"][ixf]
 
         # read into memory
@@ -85,7 +82,7 @@ def run_measure(config, rank, size, comm):
             else:
                 pass
             maxdvv = config["skipfactor"] * 1. / (2. * freq_band[1] *
-                                        max(abs(np.array(twin))))
+                                                  max(abs(np.array(twin))))
             config["maxdvv"] = maxdvv
 
             # window
@@ -99,18 +96,23 @@ def run_measure(config, rank, size, comm):
             else:
                 pass
 
-
             output_table = run_measurement(dset, config, twin, freq_band, rank, comm)
             if rank == 0 and config["use_clusters"]:
                 output_table["cluster"] = np.ones(len(output_table)) * cl_label
+            else:
+                pass
             output = pd.concat([output, output_table], ignore_index=True)
 
             comm.Barrier()
             if rank == 0:
                 del dset.dataset[1]
+                try:
+                    del dset.dataset[2]
+                except KeyError:
+                    pass
             else:
                 pass
-    # at the end write all to file
+    # at the end write all to file (the last channel pair)
     if rank == 0:
         outfile_name = "{}_{}_{}.csv".format(ch_id, config["measurement_type"],
                                              config["reference_type"])

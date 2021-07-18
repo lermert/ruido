@@ -1,23 +1,12 @@
 # coding: utf-8
-from ruido.classes.cc_dataset_mpi import CCDataset, CCData
+from ruido.classes.cc_dataset_mpi import CCDataset
 from obspy import UTCDateTime
-from obspy.signal.filter import envelope
-from obspy.signal.invsim import cosine_taper
-from scipy.signal import find_peaks
 import time
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import os
 import h5py
 from glob import glob
 from warnings import warn
-from mpi4py import MPI
-try:
-    from cmcrameri import cm
-except ImportError:
-    print("cmcrameri is not installed.")
-    print("Install it to use perceptually uniform scientific colormaps.")
 
 def add_stacks(dset, config, rank):
 
@@ -98,6 +87,7 @@ def run_stacking(config, rank, size, comm):
         print("*"*80)
         print("Running stacking.")
         print("*"*80)
+
     # loop over frequency bands
     for ixf, freq_band in enumerate(config["freq_bands"]):
         ids_done = []
@@ -123,7 +113,8 @@ def run_stacking(config, rank, size, comm):
                                                                                           ch2)))
                         if len(input_files) == 0:
                             continue
-                        # VERY IMPORTANT
+                        # VERY IMPORTANT: sort so that e.g.
+                        # chronologic order of input files is preserved
                         input_files.sort()
 
                         if config["use_clusters"]:
@@ -144,6 +135,7 @@ def run_stacking(config, rank, size, comm):
                                     dset.dataset[0].add_cluster_labels(clusters)
                                 else:
                                     pass
+                                print("here")
                             else:
                                 dset.add_datafile(f)
                                 dset.data_to_memory(keep_duration=config["duration"])
@@ -164,6 +156,7 @@ def run_stacking(config, rank, size, comm):
                             dset.filter_data(f_hp=freq_band[0], f_lp=freq_band[1], taper_perc=0.2,
                                              filter_type=config["filt_type"], stacklevel=0,
                                              maxorder=config["filt_maxord"])
+                            print("Filtering done")
                             if rank == 0:
                                 # try:
                                 #     t_running = dset.dataset[1].timestamps.max() + config["step"]
