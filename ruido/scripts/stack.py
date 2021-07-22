@@ -113,6 +113,8 @@ def run_stacking(config, rank, size, comm):
                                                                                           station2,
                                                                                           ch2)))
                         if len(input_files) == 0:
+                            if config["print_debug"] and rank == 0:
+                                print("No input for this channel.")
                             continue
                         # VERY IMPORTANT: sort so that e.g.
                         # chronologic order of input files is preserved
