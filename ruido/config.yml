@@ -23,14 +23,19 @@ input_directories: tests/test*/
 # stations, channels to consider
 stations:
 - MULU
+# channels as they appear in data
+# e.g. if data files are named MULU.HHZ--MULU.HHN,
+# order the list as [HHZ, HHN]
 channels:
-- HHE
-- HHN
 - HHZ
+- HHN
+- HHE
 # drop autocorrelations: if true, then all auto-
 # correlations (like BHE-BHE, BHN-BHN) etc will be 
 # ignored.
 drop_autocorrelations: false
+# only single station correlations?
+only_singlestation: true
 # frequency bands: These will be used throughout
 # clustering, stacking and measurement.
 freq_bands:

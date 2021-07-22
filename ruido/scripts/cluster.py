@@ -21,9 +21,10 @@ def run_clustering(config, rank, size, comm):
     for station1 in config["stations"]:
         for station2 in config["stations"]:
             # loop over components
-            for ch1 in config["channels"]:
-                for ch2 in config["channels"]:
-
+            for ixch, ch1 in enumerate(config["channels"]):
+                for ch2 in config["channels"][ixch:]:
+                    if station1 != station2 and config["only_singlestation"]:
+                        continue
                     to_do.append([station1, station2, ch1, ch2])
 
     for id_to_do in to_do[rank::size]:
