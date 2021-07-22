@@ -42,6 +42,12 @@ def run_clustering(config, rank, size, comm):
             print("Rank {} working on {}.".format(rank, channel_id))
 
         # find input files by glob
+        if config["print_debug"]:
+            print("Rank {} looking for {}".format(rank, os.path.join(config["input_directories"],
+                                      "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
+                                                              ch1,
+                                                              station2,
+                                                              ch2))))
         datafiles = glob(os.path.join(config["input_directories"],
                                       "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
                                                               ch1,
