@@ -83,7 +83,7 @@ class CCData(object):
 
         self.data = self.data[ixfinite]
         ntraces_new = self.data.shape[0]
-        print("Removed {} of {} traces due to NaN values.".format(self.ntraces - ntraces_new, ntraces))
+        print("Removed {} of {} traces due to NaN values.".format(self.ntraces - ntraces_new, self.ntraces))
         print("Dates of removed segments:")
         for t in self.timestamps[np.invert(ixfinite)]:
             print(UTCDateTime(t))
