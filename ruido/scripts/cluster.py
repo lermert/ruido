@@ -13,9 +13,10 @@ def run_clustering(config, rank, size, comm):
         print("*"*80)
         print("Running clustering.")
         print("*"*80)
+    else:
+        pass
 
     # loop over stations
-    ids_done = []
     to_do = []
     # parallelism: Distribute by input channel list
     for station1 in config["stations"]:
@@ -25,8 +26,11 @@ def run_clustering(config, rank, size, comm):
                 for ch2 in config["channels"][ixch:]:
                     if station1 != station2 and config["only_singlestation"]:
                         continue
+                    # check if this is an autocorrelation and if yes, continue if drop_autocorrelations is true
+                    if config["drop_autocorrelations"] and ch1 == ch2:
+                        continue
                     to_do.append([station1, station2, ch1, ch2])
-
+    print("Rank {}, to do length {}, from {} to {}.".format(rank, len(to_do), to_do[0], to_do[-1]))
     for id_to_do in to_do[rank::size]:
         station1 = id_to_do[0]
         station2 = id_to_do[1]
@@ -37,14 +41,6 @@ def run_clustering(config, rank, size, comm):
         if config["print_debug"]:
             print("Rank {} working on {}.".format(rank, channel_id))
 
-        if channel_id in ids_done:
-            continue
-        else:
-            ids_done.append(channel_id)
-        # check if this is an autocorrelation and if yes, continue if drop_autocorrelations is true
-        if config["drop_autocorrelations"] and ch1 == ch2:
-            continue
-
         # find input files by glob
         datafiles = glob(os.path.join(config["input_directories"],
                                       "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
@@ -52,7 +48,7 @@ def run_clustering(config, rank, size, comm):
                                                               station2,
                                                               ch2)))
         if len(datafiles) == 0:
-            print("No files found.")
+            print("Rank {}: No files found for {}.".format(rank, channel_id))
             continue
         datafiles.sort()
 
