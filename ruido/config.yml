@@ -68,6 +68,16 @@ msr_dir: output/measurements
 # from each of them.
 # if you want to use all available data, set to "all"
 n_samples_each_file: 1000
+# cluster per file, and then try to match day-times
+# of the clusters: if not, windows from all files
+# will be compared to each other.
+# if time is longer than 5 years, then
+# cluster_by_file: true is probably advisable
+cluster_by_file: false
+# if cluster by file, then the code will try to re-
+# combine the clusters and sort the largest two into
+# daytime and nighttime
+local_morning_hour: 12
 # clustering is done in windows of the whole cc wave
 # form (assuming that not every wiggle up to very 
 # long lag is important). Windows are symmetric Tukey

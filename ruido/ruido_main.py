@@ -11,7 +11,12 @@ configfile = sys.argv[1]
 config = read_config(configfile)
 
 if config["do_clustering"]:
-    cluster.run_clustering(config, rank, size, comm)
+
+    if not config["cluster_by_file"]:
+        cluster.run_clustering(config, rank, size, comm)
+    else:
+        cluster.run_clustering_byfile(config, rank, size, comm)
+
     if config["print_debug"]:
         print("Rank {} is back from clustering.".format(rank))
     comm.Barrier()
