@@ -322,8 +322,15 @@ def run_clustering_byfile(config, rank, size, comm):
                 pca_output = pca_rand.transform(X)
 
                 # do the clustering
-                range_ncomps = range(1, config["nclustmax"] + 1)
-                gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output, range_ncomps)
+                if config["nclustmax"] is not None:
+                    range_ncomps = range(1, config["nclustmax"] + 1)
+                    gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
+                        range_GMM=range_ncomps)
+                elif config["n_clusters"] is not None:
+                    gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
+                        fixed_nc=config["n_clusters"])
+                else:
+                    raise ValueError("Must provide either nclustmax or n_clusters in config.yml")
 
                 # save the cluster labels
                 labels = np.zeros((3, len(dset.dataset[1].timestamps)))

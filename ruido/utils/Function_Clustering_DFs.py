@@ -122,20 +122,25 @@ def run_pca(mat, n_pca_min=3, min_cumul_var_perc=0.9):
     return(pca)
 
 
-def gmm(matpc, range_GMM):
+def gmm(matpc, range_GMM=None, fixed_nc=None):
 
-    # Compute the GMM for different number of clusters set by "range_GMM"
-    models = [GaussianMixture(n, covariance_type='full', random_state=0,
-                              max_iter=10000).fit(matpc) for n in range_GMM]
-    # Compute the Bayesian information criterion (BIC) for each model
-    BICF = [m.bic(matpc) / 1000 for m in models]
-    # Determine the best number of clusters using the knee (or elbow)
-    kn = KneeLocator(range_GMM, BICF, S=1, curve='convex',
-                     direction='decreasing')
-    n_clusters = kn.knee
-    if n_clusters is None:
-        n_clusters = 1
 
+    if range_GMM is not None:
+        # Compute the GMM for different number of clusters set by "range_GMM"
+        models = [GaussianMixture(n, covariance_type='full', random_state=0,
+                                  max_iter=10000).fit(matpc) for n in range_GMM]
+        # Compute the Bayesian information criterion (BIC) for each model
+        BICF = [m.bic(matpc) / 1000 for m in models]
+        # Determine the best number of clusters using the knee (or elbow)
+        kn = KneeLocator(range_GMM, BICF, S=1, curve='convex',
+                         direction='decreasing')
+        n_clusters = kn.knee
+        if n_clusters is None:
+            n_clusters = 1
+    else:
+        n_clusters = fixed_nc
+
+    assert type(n_clusters) == int, "Provide either range_GMM or fixed_nc."
     # Perform clustering for the best number of clusters
     gmix = GaussianMixture(n_components=n_clusters, covariance_type='full',
                            max_iter=10000)
