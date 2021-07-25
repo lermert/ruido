@@ -325,10 +325,10 @@ def run_clustering_byfile(config, rank, size, comm):
                 if config["nclustmax"] is not None:
                     range_ncomps = range(1, config["nclustmax"] + 1)
                     gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
-                        range_GMM=range_ncomps)
+                        range_GMM=range_ncomps, max_iter=config["max_gmm_iter"])
                 elif config["n_clusters"] is not None:
                     gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
-                        fixed_nc=config["n_clusters"])
+                        fixed_nc=config["n_clusters"], max_iter=config["max_gmm_iter"])
                 else:
                     raise ValueError("Must provide either nclustmax or n_clusters in config.yml")
 

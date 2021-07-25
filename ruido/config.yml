@@ -98,6 +98,8 @@ nclustmax: 12
 # alternatively: Fix manually nr. clusters (usually
 # after test run for n_clusters)
 n_clusters: 4
+# maximum nr. of iterations for Gaussian mixture model fitting
+max_gmm_iter: 10000
 # apply spectral whitening before clustering
 # whitening will be applied between 0.75 * the lowest
 # frequency and 1.5 the highest freq. of the relevant
