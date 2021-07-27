@@ -328,7 +328,9 @@ def run_clustering_byfile(config, rank, size, comm):
                         range_GMM=range_ncomps, max_iter=config["max_gmm_iter"])
                 elif config["n_clusters"] is not None:
                     gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
-                        fixed_nc=config["n_clusters"], max_iter=config["max_gmm_iter"])
+                        fixed_nc=config["n_clusters"], max_iter=config["max_gmm_iter"],
+                        tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],
+                        n_init=config["gmm_n_init"], verbose=config["gmm_verbose"])
                 else:
                     raise ValueError("Must provide either nclustmax or n_clusters in config.yml")
 

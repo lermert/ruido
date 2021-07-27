@@ -100,6 +100,14 @@ nclustmax: 12
 n_clusters: 4
 # maximum nr. of iterations for Gaussian mixture model fitting
 max_gmm_iter: 10000
+# tolerance for interrupting iterations for GMM
+gmm_iter_tol: 1.0e-3
+# regularization of covariance for GMM
+gmm_reg_covar: 1.0e-6
+# number of randomly initialized runs for each GMM
+gmm_n_init: 1
+# put out info every 100 iterations in GMM
+gmm_verbose: true
 # apply spectral whitening before clustering
 # whitening will be applied between 0.75 * the lowest
 # frequency and 1.5 the highest freq. of the relevant
