@@ -90,7 +90,7 @@ class CCData_serial(object):
         rms = np.zeros(self.ntraces)
 
         for i, dat in enumerate(self.data):
-            rms[i] = np.sqrt(((dat - dat.mean()) ** 2).mean())
+            rms[i] = np.sqrt(((dat - np.nanmean(dat)) ** 2).mean())
             if np.isnan(rms[i]):
                 print("Nan during RMS: ", rms[i], i, dat.mean())
                 # make the value large so that these windows get discarded
