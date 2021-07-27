@@ -140,8 +140,8 @@ def gmm(matpc, range_GMM=None, fixed_nc=None, max_iter=10000):
     else:
         models = []
         n_clusters = fixed_nc
+        BICF = None
 
-    assert type(n_clusters) == int, "Provide either range_GMM or fixed_nc."
     # Perform clustering for the best number of clusters
     gmix = GaussianMixture(n_components=n_clusters, covariance_type='full',
                            max_iter=max_iter)
