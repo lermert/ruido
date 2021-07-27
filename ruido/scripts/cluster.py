@@ -186,7 +186,9 @@ def run_clustering(config, rank, size, comm):
 
             # do the clustering
             range_ncomps = range(1, config["nclustmax"] + 1)
-            gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(all_pccs, range_ncomps)
+            gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(all_pccs, range_ncomps, max_iter=config["max_gmm_iter"],
+                                                                tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],
+                                                                n_init=config["gmm_n_init"], verbose=config["gmm_verbose"])
 
             # save the cluster labels
             labels = np.zeros((3, len(all_timestamps)))
@@ -325,7 +327,9 @@ def run_clustering_byfile(config, rank, size, comm):
                 if config["nclustmax"] is not None:
                     range_ncomps = range(1, config["nclustmax"] + 1)
                     gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
-                        range_GMM=range_ncomps, max_iter=config["max_gmm_iter"])
+                        range_GMM=range_ncomps, max_iter=config["max_gmm_iter"],
+                        tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],
+                        n_init=config["gmm_n_init"], verbose=config["gmm_verbose"])
                 elif config["n_clusters"] is not None:
                     gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
                         fixed_nc=config["n_clusters"], max_iter=config["max_gmm_iter"],
