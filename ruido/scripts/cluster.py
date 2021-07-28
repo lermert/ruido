@@ -185,7 +185,7 @@ def run_clustering(config, rank, size, comm):
             all_timestamps = np.array(all_timestamps)
 
             # do the clustering
-            range_ncomps = range(2, config["nclustmax"] + 1)
+            range_ncomps = range(config["nclustmin"], config["nclustmax"] + 1)
             gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(all_pccs, range_ncomps, max_iter=config["max_gmm_iter"],
                                                                 tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],
                                                                 n_init=config["gmm_n_init"], verbose=config["gmm_verbose"])
@@ -325,7 +325,7 @@ def run_clustering_byfile(config, rank, size, comm):
 
                 # do the clustering
                 if config["nclustmax"] is not None:
-                    range_ncomps = range(2, config["nclustmax"] + 1)
+                    range_ncomps = range(config["nclustmin"], config["nclustmax"] + 1)
                     gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
                         range_GMM=range_ncomps, max_iter=config["max_gmm_iter"],
                         tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],

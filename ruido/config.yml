@@ -94,6 +94,7 @@ expl_var: 0.9
 # the final number will be based on estimating 
 # the "knee" of the Bayesian information criterion 
 # (as implemented by Viens & Iwata)
+nclustmin: 2
 nclustmax: 12
 # alternatively: Fix manually nr. clusters (usually
 # after test run for n_clusters)
