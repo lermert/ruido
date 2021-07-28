@@ -98,10 +98,15 @@ def gmm(matpc, range_GMM=None, fixed_nc=None, max_iter=10000,
         BICF = None
 
     # Perform clustering for the best number of clusters
+    if n_init > 1:
+        init_type = "random"
+    else:
+        init_type = "kmeans"
     gmix = GaussianMixture(n_components=n_clusters, covariance_type='full',
                            max_iter=max_iter, tol=tol, n_init=n_init,
                            reg_covar=reg_covar, verbose=verbose,
-                           verbose_interval=max_iter//10)
+                           verbose_interval=max_iter//10,
+                           init_params=init_type)
     gmix.fit(matpc)
     gmixfinPCA = gmix.predict(matpc)
     probs = gmix.predict_proba(matpc)

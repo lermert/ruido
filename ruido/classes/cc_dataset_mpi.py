@@ -7,6 +7,7 @@ from scipy.signal import sosfilt, sosfiltfilt, hann, tukey, fftconvolve
 from scipy.fftpack import next_fast_len
 from scipy.interpolate import interp1d
 from ruido.utils import filter
+from ruido.utils.cc_pol import cc_timeshift
 import os
 from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten,\
     mwcs_dvv, robust_stack
@@ -769,7 +770,7 @@ run measure_dvv_ser on one process.")
         ccoeff = np.zeros(len(indices))
         best_ccoeff = np.zeros(len(indices))
 
-        if method in ["stretching", "mwcs"]:
+        if method in ["stretching", "mwcs", "cc_timeshift"]:
             dvv = np.zeros((len(indices), 1))
             dvv_error = np.zeros((len(indices), 1))
         elif method == "dtw":
@@ -815,6 +816,10 @@ run measure_dvv_ser on one process.")
                 delta_dvvp = errp
                 coeffp = np.nan
                 cdpp = np.nan
+            elif method == "cc_timeshift":
+                dvvp, coeffp, cdpp = cc_timeshift(reference, tr, fs)
+                delta_dvvp = np.nan
+
 
             dvv[cnt, :] = dvvp
             dvv_times[cnt] = timestamps[i]

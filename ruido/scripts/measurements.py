@@ -240,9 +240,13 @@ def measurement_trailing(dset, config, twin, freq_band, rank, comm,
     else:
         return([], [], [], [], [], [])
 
+
 def measurement_list(dset, config, twin, freq_band, rank, comm):
     return_empty = False
 
+    if config["measurement_type"] == "cc_timeshift":
+        assert config["reference_type"] == "list", "Run CC timeshift only with a list of references"
+        
     if rank == 0:
         data = dset.dataset[1]
         if config["reference_type"] == "list":
