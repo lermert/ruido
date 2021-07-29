@@ -270,9 +270,10 @@ def run_clustering_byfile(config, rank, size, comm):
             fmin, fmax = freq_band
             twin_hw = config["hw_factor"] / fmin
 
-            # determine output and if this has been computed already
+            # determine output filename
+            input_dir_str = dfile.split("/")[-2]
             outputfile = "{}.{}-{}.{}_{}-{}Hz.gmmlabels.{}.npy".format(station1, ch1, station2, ch2,
-                                                                       fmin, fmax, ixfile)
+                                                                       fmin, fmax, input_dir_str)
 
             # copy before filtering
             # create dataset on level 1
