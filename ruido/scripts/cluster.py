@@ -222,7 +222,9 @@ def run_clustering_byfile(config, rank, size, comm):
                     if config["drop_autocorrelations"] and ch1 == ch2:
                         continue
                     to_do.append([station1, station2, ch1, ch2])
-
+    if config["print_debug"]:
+        print(to_do)
+    
     # here due to the by-year approach, we can parallelize further
     all_datafiles = []
     for id_to_do in to_do:
@@ -238,13 +240,19 @@ def run_clustering_byfile(config, rank, size, comm):
                                                               ch1,
                                                               station2,
                                                               ch2)))
-        if len(datafiles) == 0:
-            print("Rank {}: No files found for {}.".format(rank, channel_id))
-            continue
+        if len(datafiles) == 0 and rank == 0:
+            print("No files found for {}.".format(rank, channel_id))
+
         all_datafiles.extend(datafiles)
-        all_datafiles.sort()
+    all_datafiles.sort()
 
     for dfile in all_datafiles[rank::size]:
+        inf = os.path.basename(dfile).split(".")
+        station1 = inf[1]
+        station2 = inf[4]
+        ch1 = inf[3][0:3]
+        ch2 = inf[6]
+
         print("{} on {}".format(rank, dfile))
         dset = CCDataset_serial(dfile)
         dset.data_to_memory()
