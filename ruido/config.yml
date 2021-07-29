@@ -157,8 +157,15 @@ use_clusters: false
 # =================================================
 # MEASUREMENT CONFIGURATION
 # =================================================
-# measurement type: "stretching"
+# measurement type: "stretching" or "cc_timeshift"
 measurement_type: stretching
+# if using cc timeshift: specify windows at how many times
+# the longest period should be measured
+# IMPORTANT: this is not in seconds but in multiples of 
+# longest period (can be float value).
+# will be ignored if measurement type is "stretching"
+win_cc:
+- 4
 # reference type: "bootstrap" or "list" or "increment"
 reference_type: bootstrap
 # how many samples for bootstrapping

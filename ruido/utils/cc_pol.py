@@ -7,15 +7,14 @@ def cc_timeshift(reference, trace, fs):
     npts = len(trace)
 
     if npts % 2 == 1:  # odd
-        lag = np.linspace(-(npts - 1) // 2, (npts - 1) // 2, npts)
+        lag = np.linspace(-(npts - 1) // 2 / fs, (npts - 1) // 2 / fs, npts)
     else:  # even
-        lag = np.linspace(-npts // 2, (npts - 1) // 2, npts)
-
+        lag = np.linspace(-npts // 2 / fs, (npts - 1) // 2 / fs, npts)
+    print(lag)
     ccorr = np.correlate(trace, reference, "same")
-    cc_t = lag[np.argmax(ccorr)]
-    ccoeff_best = np.max(ccorr)
-    ccoeff_start = np.corrcoeff(trace, reference)[0][0]
+    shift = np.argmax(ccorr)
+    cc_t = lag[shift]
+    ccoeff_best = np.max(ccorr) / (np.sqrt(np.sum(trace ** 2)) * np.sqrt(np.sum(reference ** 2)))
+    ccoeff_start = np.corrcoef(trace, reference)[1][0]
 
     return cc_t, ccoeff_best, ccoeff_start
-
-

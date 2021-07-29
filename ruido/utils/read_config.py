@@ -34,15 +34,26 @@ tuples of fmin, fmax"
     # define the time windows
     config["plot_tmax"] = []
     config["twins"] = []
-    for freq_band in config["freq_bands"]:
-        longest_t = 1. / freq_band[0]
-        twinsf = []
-        twinsf.append([-20. * longest_t, -8. * longest_t])
-        twinsf.append([-10. * longest_t, -4. * longest_t])
-        twinsf.append([ 4. * longest_t, 10. * longest_t])
-        twinsf.append([ 8. * longest_t, 20. * longest_t])
-        config["twins"].append(twinsf)
-        config["plot_tmax"].append(10.0 * longest_t)
+
+    if config["measurement_type"] == "stretching":
+        for freq_band in config["freq_bands"]:
+            longest_t = 1. / freq_band[0]
+            twinsf = []
+            twinsf.append([-20. * longest_t, -8. * longest_t])
+            twinsf.append([-10. * longest_t, -4. * longest_t])
+            twinsf.append([ 4. * longest_t, 10. * longest_t])
+            twinsf.append([ 8. * longest_t, 20. * longest_t])
+            config["twins"].append(twinsf)
+            config["plot_tmax"].append(10.0 * longest_t)
+    elif config["measurement_type"] == "cc_timeshift":
+        for freq_band in config["freq_bands"]:
+            longest_t = 1. / freq_band[0]
+            twinsf = []
+            for win_cc in config["win_cc"]:
+                twinsf.append([win_cc * longest_t, (win_cc + 1) * longest_t])
+                twinsf.append([-(win_cc + 1) * longest_t, -win_cc * longest_t])
+            config["twins"].append(twinsf)
+            config["plot_tmax"].append(10.0 * longest_t)
 
 
     # directory setup
