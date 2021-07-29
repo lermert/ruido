@@ -91,7 +91,7 @@ def gmm(matpc, range_GMM=None, fixed_nc=None, max_iter=10000,
                          direction='decreasing')
         n_clusters = kn.knee
         if n_clusters is None:
-            n_clusters = 1
+            n_clusters = min(range_GMM)
     else:
         models = []
         n_clusters = fixed_nc
