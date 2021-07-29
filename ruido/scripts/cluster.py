@@ -349,70 +349,77 @@ def run_clustering_byfile(config, rank, size, comm):
 
     del dset
 
-    comm.Barrier()
+    comm.Barrier()  # wait for all files to be completed
 
     # now we have to recombine.
-    for freq_band in config["freq_bands"]:
-        fmin, fmax = freq_band
-        globfile = os.path.join(config["cluster_dir"],
-                                "{}.{}-{}.{}_{}-{}Hz.gmmlabels.*.npy".format(station1, ch1, station2, ch2,
-                                                                fmin, fmax))
-        files_to_combine = glob(globfile)
+    for id_to_do in to_do[rank::size]:
+        station1 = id_to_do[0]
+        station2 = id_to_do[1]
+        ch1 = id_to_do[2]
+        ch2 = id_to_do[3]
+        # channel id
+        channel_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
+        for freq_band in config["freq_bands"]:
+            fmin, fmax = freq_band
+            globfile = os.path.join(config["cluster_dir"],
+                                    "{}.{}-{}.{}_{}-{}Hz.gmmlabels.*.npy".format(station1, ch1, station2, ch2,
+                                                                    fmin, fmax))
+            files_to_combine = glob(globfile)
 
-        all_labels = []
-        all_timestamps = []
-        all_probs = []
-        for cfile in files_to_combine:
-            print(cfile)
-            newcl = np.load(cfile)
-            newlabels = np.zeros(newcl.shape[1])
-            # check the size of the clusters.
-            clustsize = []
-            clabels_unique = np.unique(newcl[1, :])
-            for clcl in clabels_unique:
-                clustsize.append((newcl[1, :] == clcl).sum())
-            cl_ranked = clabels_unique[np.array(clustsize).argsort()[::-1]]
-            print("labels, cluster sizes, ranking" , clabels_unique, clustsize, cl_ranked)
-            # for two largest: separate them into day / night if possible
-            for cl_r in cl_ranked[0: 2]:
-                ix_of_cluster = np.where(newcl[1, :] == cl_r)[0]
-                times_of_cluster = newcl[0, ix_of_cluster]
-                for ixtc in range(len(times_of_cluster)):
-                    times_of_cluster[ixtc] = int(UTCDateTime(times_of_cluster[ixtc]).strftime("%H"))
-                med_time = np.median(times_of_cluster)
-                print(med_time)
-                # call night 1 and day 2
-                if med_time < int(config["local_morning_hour"]):
-                    if np.any(newlabels == 1):
-                        print("Two clusters at night! Labeling as 1 and -1")
-                        newlabels[ix_of_cluster] = -1
+            all_labels = []
+            all_timestamps = []
+            all_probs = []
+            for cfile in files_to_combine:
+                print(cfile)
+                newcl = np.load(cfile)
+                newlabels = np.zeros(newcl.shape[1])
+                # check the size of the clusters.
+                clustsize = []
+                clabels_unique = np.unique(newcl[1, :])
+                for clcl in clabels_unique:
+                    clustsize.append((newcl[1, :] == clcl).sum())
+                cl_ranked = clabels_unique[np.array(clustsize).argsort()[::-1]]
+                print("labels, cluster sizes, ranking" , clabels_unique, clustsize, cl_ranked)
+                # for two largest: separate them into day / night if possible
+                for cl_r in cl_ranked[0: 2]:
+                    ix_of_cluster = np.where(newcl[1, :] == cl_r)[0]
+                    times_of_cluster = newcl[0, ix_of_cluster]
+                    for ixtc in range(len(times_of_cluster)):
+                        times_of_cluster[ixtc] = int(UTCDateTime(times_of_cluster[ixtc]).strftime("%H"))
+                    med_time = np.median(times_of_cluster)
+                    print(med_time)
+                    # call night 1 and day 2
+                    if med_time < int(config["local_morning_hour"]):
+                        if np.any(newlabels == 1):
+                            print("Two clusters at night! Labeling as 1 and -1")
+                            newlabels[ix_of_cluster] = -1
+                        else:
+                            newlabels[ix_of_cluster] = 1
+
                     else:
-                        newlabels[ix_of_cluster] = 1
+                        newlabels[ix_of_cluster] = 2
 
-                else:
-                    newlabels[ix_of_cluster] = 2
+                    # call the others in their order
+                for ixclr, cl_r in enumerate(cl_ranked[2:]):
+                    ix_of_cluster = np.where(newcl[1, :] == cl_r)[0]
+                    newlabels[ix_of_cluster] = 3 + ixclr
 
-                # call the others in their order
-            for ixclr, cl_r in enumerate(cl_ranked[2:]):
-                ix_of_cluster = np.where(newcl[1, :] == cl_r)[0]
-                newlabels[ix_of_cluster] = 3 + ixclr
+                # append
+                all_timestamps.extend(newcl[0, :])
+                all_labels.extend(newlabels)
+                all_probs.extend(newcl[2, :])
+            # turn all into numpy array and save
+            all_timestamps = np.ravel(np.array(all_timestamps))
+            all_labels = np.ravel(np.array(all_labels))
+            all_probs = np.ravel(np.array(all_probs))
+            print(all_timestamps.shape, all_labels.shape, all_probs.shape)
+            outoutfile = "{}.{}-{}.{}_{}-{}Hz.gmmlabels.npy".format(station1, ch1, station2, ch2,
+                                                                    fmin, fmax)
+            # save the cluster labels
+            labels = np.zeros((3, len(all_timestamps)))
+            labels[0] = all_timestamps
+            labels[1] = all_labels
+            labels[2] = all_probs
+            np.save(os.path.join(config["cluster_dir"], outoutfile), labels)
 
-            # append
-            all_timestamps.extend(newcl[0, :])
-            all_labels.extend(newlabels)
-            all_probs.extend(newcl[2, :])
-        # turn all into numpy array and save
-        all_timestamps = np.ravel(np.array(all_timestamps))
-        all_labels = np.ravel(np.array(all_labels))
-        all_probs = np.ravel(np.array(all_probs))
-        print(all_timestamps.shape, all_labels.shape, all_probs.shape)
-        outoutfile = "{}.{}-{}.{}_{}-{}Hz.gmmlabels.npy".format(station1, ch1, station2, ch2,
-                                                                fmin, fmax)
-        # save the cluster labels
-        labels = np.zeros((3, len(all_timestamps)))
-        labels[0] = all_timestamps
-        labels[1] = all_labels
-        labels[2] = all_probs
-        np.save(os.path.join(config["cluster_dir"], outoutfile), labels)
-
-return()
+    return()
