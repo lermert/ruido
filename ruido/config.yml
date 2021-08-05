@@ -90,6 +90,8 @@ twin_mid: 0.0
 hw_factor: 10
 # desired level of explaining variance by PCA
 expl_var: 0.9
+# number of principal components to keep
+nr_pc: 5
 # n clusters to try out. 
 # the final number will be based on estimating 
 # the "knee" of the Bayesian information criterion 

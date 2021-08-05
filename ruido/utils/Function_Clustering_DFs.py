@@ -42,7 +42,7 @@ from sklearn.mixture import GaussianMixture
 from kneed import KneeLocator
 
 
-def run_pca(mat, n_pca_min=3, min_cumul_var_perc=0.9):
+def run_pca(mat, nr_pc=5, n_pca_min=None, min_cumul_var_perc=None):
     """
     Inputs:
         mat: Matrix of correlation functions
@@ -60,16 +60,19 @@ def run_pca(mat, n_pca_min=3, min_cumul_var_perc=0.9):
     """
     # Perform PCA with the number of principal components given in input
 
-    cumul_var_perc = 0.
-    n_pca = n_pca_min
-    while cumul_var_perc < min_cumul_var_perc:
-        pca = PCA(n_components=n_pca)
-        pca = pca.fit(mat)
-        # Cumulative variance
-        cumul_var_perc = np.cumsum(pca.explained_variance_ratio_)[-1]
-        n_pca += 1
+    # cumul_var_perc = 0.
+    # n_pca = n_pca_min
+    # while cumul_var_perc < min_cumul_var_perc:
+    #     pca = PCA(n_components=n_pca)
+    #     pca = pca.fit(mat)
+    #     # Cumulative variance
+    #     cumul_var_perc = np.cumsum(pca.explained_variance_ratio_)[-1]
+    #     n_pca += 1
+    pca = PCA(n_components=nr_pc)
+    pca = pca.fit(mat)
+    cumul_var_perc = np.cumsum(pca.explained_variance_ratio_)[-1]
 
-    print('The first ' + str(n_pca-1) + ' PCs explain ' + str(cumul_var_perc) +
+    print('The first ' + str(nr_pc-1) + ' PCs explain ' + str(cumul_var_perc) +
           ' % of the cumulative variance')
 
     return(pca)
