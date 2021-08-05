@@ -633,7 +633,6 @@ class CCDataset_serial(object):
                 continue
 
             if type(tstamp) in [np.float64, np.float32, float]:
-                print("Float timestamps.")
                 timestamps[i - ix_corr_min] = tstamp
             else:
                 try:

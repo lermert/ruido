@@ -48,11 +48,18 @@ def run_measure(config, rank, size, comm):
                                                "dvv_err", "cluster"])
 
                 for iinf, input_file in enumerate(input_files):
-                    ixf = int(os.path.splitext(input_file)[0].split("_")[-2][2:])
+                    #ixf = int(os.path.splitext(input_file)[0].split("_")[-2][2:])
+                    f0 = float(input_file.split("_")[-2].split("-")[0])
+                    f1 = float(input_file.split("_")[-2].split("-")[-1][:-2])
+                    freq_band = [f0, f1]
+                    freqs0 = [freqs[0] for freqs in config["freq_bands"]]
+                    ixf = np.where(np.array(freqs0) == f0)[0]
+                    assert config["freq_bands"][ixf] == freq_band
                     if config["use_clusters"]:
                         cl_label = int(os.path.splitext(input_file)[0].split("_")[-1][2:])
                     station1 = os.path.basename(input_file.split(".")[1])
                     station2 = os.path.basename(input_file.split(".")[4])
+
                     #ch1 = os.path.basename(input_file.split(".")[3][0: 3])
                     assert station1 == sta
                     assert ch2 == os.path.basename(input_file.split(".")[6])
@@ -72,7 +79,7 @@ def run_measure(config, rank, size, comm):
                     #                                        "dvv_err", "cluster"])
                     #     ch_id_prev = ch_id
 
-                    freq_band = config["freq_bands"][ixf]
+                    #freq_band = config["freq_bands"][ixf]
 
                     # read into memory
                     dset = CCDataset(input_file)

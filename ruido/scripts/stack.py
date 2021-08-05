@@ -21,14 +21,12 @@ def add_stacks(dset, config, rank):
     if dset.dataset[0].cluster_labels is not None:
 
         for clabel in np.unique(dset.dataset[0].cluster_labels):
+            if clabel == -1:  # de-selected windows
+                continue
             try:
                 t_running = dset.dataset[clabel + 1].timestamps.max() + config["step"]
             except KeyError:
                 t_running = max(config["t0"], dset.dataset[0].timestamps.min())
-            # print("cluster ", clabel)
-            if clabel == -1:   # the unmatched timestamps
-                warn("Unmatched timestamps present, is this ok?")
-                continue
 
             # if t_running_in is None:
             #     t_running = max(config["t0"], dset.dataset[0].timestamps.min())
@@ -187,11 +185,11 @@ def run_stacking(config, rank, size, comm):
                                     cltag = "_cl{}".format(stacklevel)
                                 else:
                                     cltag = "_noclust"
-                                outfile = "{}.{}..{}--{}.{}..{}.ccc.stacks_{}days_{}-{}_bp{}{}.h5".format(
+                                outfile = "{}.{}..{}--{}.{}..{}.ccc.stacks_{}days_{}-{}_{}-{}Hz{}.h5".format(
                                     network, station1, ch1, network, station2, ch2, config["duration"]//86400,
                                     UTCDateTime(config["t0"]).strftime("%Y"),
                                     UTCDateTime(config["t1"]).strftime("%Y"),
-                                    ixf, cltag)
+                                    freq_band[0], freq_band[1], cltag)
                                 outfile = os.path.join(config["stack_dir"], outfile)
                                 outfile = h5py.File(outfile, "w")
                                 cwin = outfile.create_group("corr_windows")
