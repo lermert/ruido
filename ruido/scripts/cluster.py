@@ -143,7 +143,7 @@ def run_clustering(config, rank, size, comm):
                 print("Are there nans? {}".format({1:"yes", 0:"no"}[np.any(np.isnan(dset.dataset[2].data))]))
             dset.dataset[2].data = np.nan_to_num(dset.dataset[2].data)
             X = StandardScaler().fit_transform(dset.dataset[2].data)
-            pca_rand = run_pca(X, n_pc=config["nr_pc"])
+            pca_rand = run_pca(X, nr_pc=config["nr_pc"])
             # pca output is a scikit learn PCA object
             # just for testing, run the Gaussian mixture here
             # gm = gmm(pca_rand.transform(X), range(1, 12))
@@ -313,7 +313,7 @@ def run_clustering_byfile(config, rank, size, comm):
             dset.dataset[1].data = np.nan_to_num(dset.dataset[1].data)
             # only on the randomly selected subset
             X = StandardScaler().fit_transform(dset.dataset[1].data[ixs_random])
-            pca_rand = run_pca(X, n_pc=config["nr_pc"])
+            pca_rand = run_pca(X, nr_pc=config["nr_pc"])
             # pca output is a scikit learn PCA object
             # just for testing, run the Gaussian mixture here
             # gm = gmm(pca_rand.transform(X), range(1, 12))

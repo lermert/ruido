@@ -42,20 +42,13 @@ from sklearn.mixture import GaussianMixture
 from kneed import KneeLocator
 
 
-def run_pca(mat, nr_pc=5, n_pca_min=None, min_cumul_var_perc=None):
+def run_pca(mat, nr_pc=5):
     """
     Inputs:
         mat: Matrix of correlation functions
-        PC_nb: number of principal components to keep (typically 5 - 15)
-        range_GMM: range of number of clusters to determine the best number of clusters using the knee (or elbow) method (typically 2 - 15)
+        nr_pc: number of principal components to keep or "mle" (will use Bayesian dimensionality selection)
     Outputs:
-        pca_output: Output of the PCA
-        var: Cumulative explained variance for each of from 1 to "PC_nb"
-        models: GMM for different number of clusters
-        n_clusters: Best number of clusters determined by the knee method
-        gmixfinPCA: Clustering of the data with "n_clusters"
-        probs: Probability that the data belong to the cluster they were assigned to.
-        BICF: BIC score for the different number of clusters
+        pca object (see scikit learn PCA)
 
     """
     # Perform PCA with the number of principal components given in input
@@ -72,7 +65,7 @@ def run_pca(mat, nr_pc=5, n_pca_min=None, min_cumul_var_perc=None):
     pca = pca.fit(mat)
     cumul_var_perc = np.cumsum(pca.explained_variance_ratio_)[-1]
 
-    print('The first ' + str(nr_pc-1) + ' PCs explain ' + str(cumul_var_perc) +
+    print('The first ' + str(nr_pc) + ' PCs explain ' + str(cumul_var_perc) +
           ' % of the cumulative variance')
 
     return(pca)

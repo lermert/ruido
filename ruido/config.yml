@@ -88,9 +88,11 @@ local_morning_hour: 12
 twin_mid: 0.0
 # halfwidth in terms of longest period
 hw_factor: 10
-# desired level of explaining variance by PCA
-expl_var: 0.9
 # number of principal components to keep
+# integer or float between 0 and 1 or "mle"
+# if integer: This many modes will be kept
+# if float: This level of variance will be fit
+# if "mle": Bayesian dimensionality selection used
 nr_pc: 5
 # n clusters to try out. 
 # the final number will be based on estimating 
