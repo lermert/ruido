@@ -53,8 +53,12 @@ def run_measure(config, rank, size, comm):
                     f1 = float(input_file.split("_")[-2].split("-")[-1][:-2])
                     freq_band = [f0, f1]
                     freqs0 = [freqs[0] for freqs in config["freq_bands"]]
-                    ixf = np.where(np.array(freqs0) == f0)[0][0]
-                    assert config["freq_bands"][ixf] == freq_band
+                    freqs1 = [freqs[1] for freqs in config["freq_bands"]]
+                    print(freqs0)
+                    ixft = np.where(np.array(freqs0) == f0)
+                    ixf = np.intersect1d(np.where(np.array(freqs1) == f1), ixft)[0]
+                    if not config["freq_bands"][ixf] == freq_band:
+                        continue
                     if config["use_clusters"]:
                         cl_label = int(os.path.splitext(input_file)[0].split("_")[-1][2:])
                     station1 = os.path.basename(input_file.split(".")[1])

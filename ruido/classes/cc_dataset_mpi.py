@@ -977,7 +977,8 @@ run measure_dvv_ser on one process.")
                     mask_gaps=False, step=None, figsize=None,
                     color_by_cc=False, normalize_all=False, label_style="month",
                     ax=None, plot_envelope=False, ref=None,
-                    mark_17_quake=False, grid=True, marklags=[], colorful_traces=False):
+                    mark_17_quake=False, grid=True, marklags=[], colorful_traces=False,
+                    gridcolor="k", marklagcolor="b", tickstep=10.0):
         if rank != 0:
             raise ValueError("Call this function only on one process")
         if mask_gaps and step == None:
@@ -1035,7 +1036,7 @@ run measure_dvv_ser on one process.")
                         months.append(UTCDateTime(t).strftime("%Y%m"))
                 elif label_style == "year":
                     if UTCDateTime(t).strftime("%Y") not in years:
-                        ylabelticks.append(UTCDateTime(t).strftime("%Y./%m/%d"))
+                        ylabelticks.append(UTCDateTime(t).strftime("%Y/%m"))
                         ylabels.append(scale_factor_plotting * cnt)
                         years.append(UTCDateTime(t).strftime("%Y"))
                 cnt += 1
@@ -1069,7 +1070,7 @@ run measure_dvv_ser on one process.")
                     elif label_style == "year":
                         if UTCDateTime(t).strftime("%Y") not in years:
                             ylabels.append(t)
-                            ylabelticks.append(UTCDateTime(t).strftime("%Y/%m/%d"))
+                            ylabelticks.append(UTCDateTime(t).strftime("%Y/%m"))
                             years.append(UTCDateTime(t).strftime("%Y"))
 
                         
@@ -1105,7 +1106,7 @@ run measure_dvv_ser on one process.")
                     elif label_style == "year":
                         if UTCDateTime(t).strftime("%Y") not in years:
                             ylabels.append(t_to_plot_all[ix_t])
-                            ylabelticks.append(UTCDateTime(t).strftime("%Y/%m/%d"))
+                            ylabelticks.append(UTCDateTime(t).strftime("%Y/%m"))
                             years.append(UTCDateTime(t).strftime("%Y"))
                    
                 if plot_envelope:
@@ -1119,8 +1120,13 @@ run measure_dvv_ser on one process.")
                            cmap=cmap)
 
         if mark_17_quake:
-            ylabels.append(UTCDateTime("2017,262").timestamp)
-            ylabelticks.append("EQ Puebla")
+            #ylabels.append(UTCDateTime("2017,262").timestamp)
+            #ylabelticks.append("EQ Puebla")
+            ax1.plot(seconds_to_start * 0.8, UTCDateTime("2017,262").timestamp, "b*")
+            ax1.hlines(xmin=seconds_to_start, xmax=seconds_to_show, y=UTCDateTime("2017,262").timestamp,
+                       color="b", linestyle=":", linewidth=0.75)
+            ax1.annotate("EQ Puebla",xy=(seconds_to_start*0.85,
+                         UTCDateTime("2017,262").timestamp + 30*86400))
 
         ax1.set_title(self.station_pair)
         if normalize_all:
@@ -1135,24 +1141,19 @@ run measure_dvv_ser on one process.")
         ax1.yaxis.tick_right()
 
         for marklag in marklags:
-            plt.plot([marklag, marklag], [t_to_plot.min(), t_to_plot.max()], "--", color="b")
+            plt.plot([marklag, marklag], [t_to_plot.min(), t_to_plot.max()], "--", color=marklagcolor)
 
+
+        xtcks = [i for i in np.arange(seconds_to_start + (abs(seconds_to_start)%tickstep),
+                                      seconds_to_show, tickstep)]
+        xtkclbs = [str(i) for i in np.arange(seconds_to_start + (abs(seconds_to_start)%tickstep),
+                   seconds_to_show, tickstep)]
+        plt.xticks(xtcks, xtkclbs)
         if grid:
             if not colorful_traces:
-                ax1.grid(linestyle=":", color="lawngreen", axis="x")
+                ax1.grid(linestyle=":", color=gridcolor)
             else:
                 ax1.grid(axis="x")
-
-        if seconds_to_show - seconds_to_start > 50:
-            tickstep = 10.0
-        elif seconds_to_show - seconds_to_start > 20:
-            tickstep = 5.0
-        elif seconds_to_show - seconds_to_start > 10:
-            tickstep = 2.0
-        else:
-            tickstep = 1.0
-        ax1.set_xticks([i for i in np.arange(seconds_to_start, seconds_to_show, tickstep)],
-                       [str(i) for i in np.arange(seconds_to_start, seconds_to_show, tickstep)])
 
         if ax is None:
             if outfile is not None:
