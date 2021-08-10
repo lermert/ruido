@@ -53,7 +53,7 @@ def run_measure(config, rank, size, comm):
                     f1 = float(input_file.split("_")[-2].split("-")[-1][:-2])
                     freq_band = [f0, f1]
                     freqs0 = [freqs[0] for freqs in config["freq_bands"]]
-                    ixf = np.where(np.array(freqs0) == f0)[0]
+                    ixf = np.where(np.array(freqs0) == f0)[0][0]
                     assert config["freq_bands"][ixf] == freq_band
                     if config["use_clusters"]:
                         cl_label = int(os.path.splitext(input_file)[0].split("_")[-1][2:])

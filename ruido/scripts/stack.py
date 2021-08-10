@@ -213,7 +213,11 @@ def run_stacking(config, rank, size, comm):
                                     elif k in ["t0", "t1"]:
                                         stats.attrs[k] = UTCDateTime(v).strftime("%Y.%j.%H.%M.%S")
                                     else:
-                                        stats.attrs[k] = v
+                                        try:
+                                            stats.attrs[k] = v
+                                        except TypeError:
+                                            print("could not write {}: {} to output file".format(k, v))
+                                            pass
 
                                 cwin.create_dataset("data", data=dset.dataset[stacklevel].data)
                                 cwin.create_dataset("timestamps", data=dset.dataset[stacklevel].timestamps.flatten())
