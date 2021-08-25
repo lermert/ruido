@@ -16,6 +16,8 @@ from obspy.signal.filter import envelope
 from obspy.signal.detrend import polynomial as obspolynomial
 from mpi4py import MPI
 from warnings import warn
+from shapely.geometry.polygon import Polygon
+from descartes import PolygonPatch
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -978,7 +980,7 @@ run measure_dvv_ser on one process.")
                     color_by_cc=False, normalize_all=False, label_style="month",
                     ax=None, plot_envelope=False, ref=None,
                     mark_17_quake=False, grid=True, marklags=[], colorful_traces=False,
-                    gridcolor="k", marklagcolor="b", tickstep=10.0):
+                    gridcolor="k", marklagcolor="b", tickstep=10.0, marklagstyle="mask_polygon"):
         if rank != 0:
             raise ValueError("Call this function only on one process")
         if mask_gaps and step == None:
@@ -1119,10 +1121,41 @@ run measure_dvv_ser on one process.")
             ax1.pcolormesh(lag, t_to_plot, dat_mat, vmax=vmax, vmin=vmin,
                            cmap=cmap)
 
+        #for marklag in marklags:
+        #    
+        for ixml, marklag in enumerate(marklags[:-1]):
+
+            if marklagstyle == "mask_polygon":
+                if ixml == 0:
+                    nodes1 = [(seconds_to_start, t_to_plot.min()), (marklag[0], t_to_plot.min()),
+                              (marklag[0], t_to_plot.max()), (seconds_to_start, t_to_plot.max()),
+                              (seconds_to_start, t_to_plot.min()) ]
+                    poly = Polygon(nodes1)
+                    patch = PolygonPatch(poly, fc="k", ec="0.7", alpha=0.5)
+                    ax1.add_patch(patch)
+                
+                nodes1 = [(marklag[1], t_to_plot.min()), (marklags[ixml + 1][0], t_to_plot.min()),
+                          (marklags[ixml + 1][0], t_to_plot.max()), (marklag[1], t_to_plot.max()),
+                          (marklag[1], t_to_plot.min())]
+                poly = Polygon(nodes1)
+                patch = PolygonPatch(poly, fc="k", ec="0.7", alpha=0.5)
+                ax1.add_patch(patch)
+            else:
+                plt.plot([marklag, marklag], [t_to_plot.min(), t_to_plot.max()], "--", color=marklagcolor)
+
+        if marklagstyle == "mask_polygon":
+            nodes1 = [(marklags[-1][1], t_to_plot.min()), (seconds_to_show, t_to_plot.min()),
+                      (seconds_to_show, t_to_plot.max()), (marklags[-1][1], t_to_plot.max()),
+                      (marklags[-1][1], t_to_plot.min())]
+            poly = Polygon(nodes1)
+            patch = PolygonPatch(poly, fc="k", ec="0.7", alpha=0.5)
+            ax1.add_patch(patch)
+        else:
+            plt.plot([marklags[-1], marklags[-1]], [t_to_plot.min(), t_to_plot.max()], "--", color=marklagcolor)
         if mark_17_quake:
             #ylabels.append(UTCDateTime("2017,262").timestamp)
             #ylabelticks.append("EQ Puebla")
-            ax1.plot(seconds_to_start * 0.8, UTCDateTime("2017,262").timestamp, "b*")
+            #ax1.plot(seconds_to_start * 0.8, UTCDateTime("2017,262").timestamp, "b*")
             ax1.hlines(xmin=seconds_to_start, xmax=seconds_to_show, y=UTCDateTime("2017,262").timestamp,
                        color="b", linestyle=":", linewidth=0.75)
             ax1.annotate("EQ Puebla",xy=(seconds_to_start*0.85,
@@ -1140,9 +1173,7 @@ run measure_dvv_ser on one process.")
         ax1.set_yticklabels(ylabelticks)
         ax1.yaxis.tick_right()
 
-        for marklag in marklags:
-            plt.plot([marklag, marklag], [t_to_plot.min(), t_to_plot.max()], "--", color=marklagcolor)
-
+        
 
         xtcks = [i for i in np.arange(seconds_to_start + (abs(seconds_to_start)%tickstep),
                                       seconds_to_show, tickstep)]
