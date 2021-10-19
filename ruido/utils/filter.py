@@ -49,7 +49,7 @@ def get_window(t_mid, hw, lag, window_type, alpha=0.2):
         win[ix_0: ix_1] = 1.0
     return(win)
 
-def moving_average(self, a, n=3):
+def moving_average(self, a, n=3, rank=0):
     if rank != 0:
         raise ValueError("Call this function only on one process")
     ret = np.cumsum(a, dtype=np.complex)

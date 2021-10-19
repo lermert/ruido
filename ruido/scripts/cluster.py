@@ -185,11 +185,22 @@ def run_clustering(config, rank, size, comm):
             all_timestamps = np.array(all_timestamps)
 
             # do the clustering
-            range_ncomps = range(config["nclustmin"], config["nclustmax"] + 1)
-            gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(all_pccs, range_ncomps, max_iter=config["max_gmm_iter"],
-                                                                tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],
-                                                                n_init=config["gmm_n_init"], verbose=config["gmm_verbose"])
-
+            if config["nclustmax"] is not None:
+                try:
+                    range_ncomps = range(config["nclustmin"], config["nclustmax"] + 1)
+                    gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(all_pccs, range_ncomps, max_iter=config["max_gmm_iter"],
+                                                                       tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],
+                                                                       n_init=config["gmm_n_init"], verbose=config["gmm_verbose"])
+                except ValueError:
+                    continue
+            elif config["n_clusters"] is not None:
+                try:
+                    gmmodels, n_clusters, gmixfinPCA, probs, BICF = gmm(pca_output,
+                        fixed_nc=config["n_clusters"], max_iter=config["max_gmm_iter"],
+                        tol=config["gmm_iter_tol"], reg_covar=config["gmm_reg_covar"],
+                        n_init=config["gmm_n_init"], verbose=config["gmm_verbose"])
+                except ValueError:
+                    continue
             # save the cluster labels
             labels = np.zeros((3, len(all_timestamps)))
             labels[0] = all_timestamps
@@ -312,7 +323,8 @@ def run_clustering_byfile(config, rank, size, comm):
                 print("Are there nans? {}".format({1:"yes", 0:"no"}[np.any(np.isnan(dset.dataset[1].data))]))
             dset.dataset[1].data = np.nan_to_num(dset.dataset[1].data)
             # only on the randomly selected subset
-            X = StandardScaler().fit_transform(dset.dataset[1].data[ixs_random])
+            X = StandardScaler().fit_transform(dset.dataset[1].data)
+            X = dset.dataset[1].data[ixs_random]
             pca_rand = run_pca(X, nr_pc=config["nr_pc"])
             # pca output is a scikit learn PCA object
             # just for testing, run the Gaussian mixture here
