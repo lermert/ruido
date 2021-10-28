@@ -111,7 +111,7 @@ def run_clustering(config, rank, size, comm):
                                                                     fmin, fmax)
             if os.path.exists(os.path.join(config["cluster_dir"], outputfile)):
                 if config["print_debug"]:
-                    print("File {} has already been computed, continuing...".format(outputfile))
+                    print("File {} has already been computed, skipping this component.".format(outputfile))
                 continue
 
 
@@ -142,6 +142,9 @@ def run_clustering(config, rank, size, comm):
             if config["print_debug"]:
                 print("Are there nans? {}".format({1:"yes", 0:"no"}[np.any(np.isnan(dset.dataset[2].data))]))
             dset.dataset[2].data = np.nan_to_num(dset.dataset[2].data)
+            if dset.dataset[2].data.shape[0] < config["nr_pc"]:
+                print("File has fewer traces than nr_pc, skipping...")
+                continue
             X = StandardScaler().fit_transform(dset.dataset[2].data)
             pca_rand = run_pca(X, nr_pc=config["nr_pc"])
             # pca output is a scikit learn PCA object
@@ -322,6 +325,10 @@ def run_clustering_byfile(config, rank, size, comm):
             if config["print_debug"]:
                 print("Are there nans? {}".format({1:"yes", 0:"no"}[np.any(np.isnan(dset.dataset[1].data))]))
             dset.dataset[1].data = np.nan_to_num(dset.dataset[1].data)
+            if dset.dataset[1].data.shape[0] < config["nr_pc"]:
+                print("File contains fewer traces than nr_pc, skipping. File: {}. \
+Nr of traces in this file: {}".format(dfile, dset.dataset[1].data.shape[0]))
+                continue
             # only on the randomly selected subset
             X = StandardScaler().fit_transform(dset.dataset[1].data)
             X = dset.dataset[1].data[ixs_random]

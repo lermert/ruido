@@ -262,7 +262,7 @@ class CCData(object):
         else:
             raise NotImplementedError
 
-        print("selected for stack: ", ixs_selected)
+        # print("selected for stack: ", ixs_selected)
         return(ixs_selected)
 
     def demean(self):
