@@ -104,7 +104,11 @@ def run_clustering(config, rank, size, comm):
             # The clustering is performed separately in different frequency bands.
             # The selections may change depending on the frequency band.
             fmin, fmax = freq_band
-            twin_hw = config["hw_factor"] / fmin
+            if config["hw_factor"] == "full":
+                # use the full waveform
+                twin_hw = dset.dataset[1].lag.max()
+            else:
+                twin_hw = config["hw_factor"] / fmin
             
             # determine output and if this has been computed already
             outputfile = "{}.{}-{}.{}_{}-{}Hz.gmmlabels.npy".format(station1, ch1, station2, ch2,
@@ -290,7 +294,10 @@ def run_clustering_byfile(config, rank, size, comm):
             # The clustering is performed separately in different frequency bands.
             # The selections may change depending on the frequency band.
             fmin, fmax = freq_band
-            twin_hw = config["hw_factor"] / fmin
+            if config["hw_factor"] == "full":
+                twin_hw = dset.dataset[0].lag.max()
+            else:
+                twin_hw = config["hw_factor"] / fmin
 
             # determine output filename
             input_dir_str = dfile.split("/")[-2]

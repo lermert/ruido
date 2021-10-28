@@ -87,6 +87,7 @@ local_morning_hour: 12
 # center of window in terms of lag, seconds
 twin_mid: 0.0
 # halfwidth in terms of longest period
+# or set to "full" to use the entire waveform
 hw_factor: 10
 # number of principal components to keep
 # integer or float between 0 and 1 or "mle"
