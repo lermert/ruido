@@ -38,7 +38,8 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
         dvv, dvv_timest, ccoeff, \
             best_ccoeff, dvv_error = dset.measure_dvv_par(f0=freq_band[0], f1=freq_band[1], ref=ref, stacklevel=2,
                                                           ngrid=100, method=conf["measurement_type"],
-                                                          dvv_bound=maxdvv)
+                                                          dvv_bound=maxdvv, moving_window_length=2./freq_band[0],
+                                                          moving_window_step=1./freq_band[0])
         comm.barrier()
         if rank == 0:
             for j in range(i + 1, n):
@@ -99,6 +100,8 @@ def measurement_incremental(dset, config, twin, freq_band, rank, comm,
                                           ref=ref, ngrid=config["ngrid"],
                                            method=config["measurement_type"], indices=[ix],
                                            dvv_bound=config["maxdvv"],
+                                           moving_window_length=2./freq_band[0],
+                                           moving_window_step=1./freq_band[0]
                                              )
         t[ix] = dvv_timestp[0]
         dvv[ix] = dvvp[0]
@@ -201,6 +204,8 @@ def measurement_trailing(dset, config, twin, freq_band, rank, comm,
                                    method=config["measurement_type"],
                                    indices=[ix],
                                    dvv_bound=config["maxdvv"],
+                                   moving_window_length=2./freq_band[0],
+                                    moving_window_step=1./freq_band[0]
                                    )
         t[ix] = dvv_timestp[0]
         dvv[ix] = dvvp[0]
@@ -349,6 +354,8 @@ def measurement_list(dset, config, twin, freq_band, rank, comm):
                                                  ref=ref, ngrid=config["ngrid"], stacklevel=1,
                                                  method=config["measurement_type"], indices=[ix],
                                                  dvv_bound=config["maxdvv"],
+                                                 moving_window_length=2./freq_band[0],
+                                                 moving_window_step=1./freq_band[0]
                                                  )
             t[ix] = dvv_timestp[0]
             dvv[ix] = dvvp[0]

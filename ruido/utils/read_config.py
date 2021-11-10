@@ -35,7 +35,7 @@ tuples of fmin, fmax"
     config["plot_tmax"] = []
     config["twins"] = []
 
-    if config["measurement_type"] == "stretching":
+    if config["measurement_type"] in ["stretching", "mwcs"]:
         for freq_band in config["freq_bands"]:
             longest_t = 1. / freq_band[0]
             twinsf = []
