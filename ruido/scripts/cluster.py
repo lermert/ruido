@@ -66,10 +66,13 @@ def run_clustering(config, rank, size, comm):
                 # set up the dataset for the first time
                 dset = CCDataset_serial(dfile)
                 dset.data_to_memory()
+                if len(dset.dataset) == 0:
+                    continue
             else:
                 # read the data in
                 dset.add_datafile(dfile)
                 dset.data_to_memory(keep_duration=0)
+                if len(dset.dataset) == 0: continue
             # use a random subset of each file (unless "all" requested)
             if type(config["n_samples_each_file"]) == int:
                 ixs_random = np.random.choice(np.arange(dset.dataset[0].ntraces),

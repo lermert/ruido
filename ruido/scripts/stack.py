@@ -126,8 +126,10 @@ def run_stacking(config, rank, size, comm):
                                                        "{}.{}-{}.{}_{}-{}Hz.gmmlabels.npy".format(
                                                         station1, ch1, station2, ch2, freq_band[0],
                                                         freq_band[1]))
-                            clusters = np.load(clusterfile)
-
+                            try:
+                                clusters = np.load(clusterfile)
+                            except FileNotFoundError:
+                                continue
                         # read in the data, one file at a time, adding stacks as we go along
                         dset = CCDataset(input_files[0])
 
