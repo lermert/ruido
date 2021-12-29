@@ -31,14 +31,26 @@ from numba import jit
 #--------------------------------------------------------------------------------------------------
 @jit(nopython=True)
 def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
-    if model in ["cdmx_unm", "cdmx_thvm", "cdmx_mhvm"]:
-        sed_depth = 100.0
-        zone = "hill"
-    elif model in ["cdmx_ipvm", "cdmx_aovm", "cdmx_gmvm", "cdmx_cjvm",
-    "cdmx_mpvm", "cdmx_mzvm", "cdmx_ptvm", "cdmx_tlvm",
-    "cdmx_mcvm", "cdmx_xcvm",]:
+    # BEDROCK
+    if model in ["cdmx_ipvm", "cdmx_aovm", "cdmx_gmvm", "cdmx_cjvm",
+    "cdmx_mpvm", "cdmx_mzvm", "cdmx_ptvm", "cdmx_tlvm", "ESTA",
+    "cdmx_mcvm"]:
         sed_depth=0.
         zone="hill"
+
+    # SEDIMENT (NO / VERY LITTLE CLAY)
+    elif model == "cdmx_xcvm":
+        zone = "hill"
+        upper_z = 0.0
+        sed_depth = 15.0
+    elif model in ["cdmx_thvm", "TEPE"]:
+        zone="hill"
+        sed_depth = 50.0
+    elif model in ["cdmx_unm", "cdmx_mhvm"]:
+        sed_depth = 100.0
+        zone = "hill"
+
+    # SEDIMENT (INCL. CLAY)
     elif model in ["cdmx_bjvm",  "cdmx_test"]:
         sed_depth = 200.
         zone = "lake"
@@ -50,7 +62,7 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
     elif model == "cdmx_covm":
         sed_depth = 300.
         zone = "lake"
-        upper_z = 35.
+        upper_z = 40.
     elif model == "cdmx_ctvm":
         zone = "lake"
         upper_z = 55
@@ -63,8 +75,18 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
         zone = "lake"
         upper_z = 20.0
         sed_depth = 200.0
-    else:
-        print("Unknown model ", model)
+    elif model == "MULU":
+        zone = "lake"
+        upper_z = 30
+        sed_depth = 300
+    elif model == "CIRE":
+        zone = "lake"
+        upper_z = 35
+        sed_depth = 300
+    elif model == "MIXC":
+        zone = "lake"
+        upper_z = 10
+        sed_depth = 300
 
     # model
     if z_is_radius:
