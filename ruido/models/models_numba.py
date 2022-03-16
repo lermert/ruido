@@ -67,8 +67,6 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
         clay_depth = 10
         sed_depth = 100
         site_type = "intermediate"
-    else:
-        raise ValueError("Unknown model {}".format(model))
 
     # model
     if z_is_radius:
