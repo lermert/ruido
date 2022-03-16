@@ -112,8 +112,9 @@ class CCData_serial(object):
                 cl.append(int(c[1, ix]))
             except IndexError:
                 cl.append(-1)
+        cl = np.array(cl)
         print("Nr of unmatched timestamps: ", len(cl[cl == -1]))
-        self.cluster_labels = np.array(cl)
+        self.cluster_labels = cl
 
     def align(self, t1, t2, ref, plot=False):
         l0 = np.argmin((self.lag - t1) ** 2)
