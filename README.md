@@ -1,8 +1,8 @@
-### Ruido - a set of objects to handle highly time-resolved ambient noise correlation data
+## Ruido - a set of scripts to handle highly time-resolved ambient noise correlation data
 
-The purpose of these objects and scripts is mainly to handle sets of short-term ambient noise correlation observations, and bring us from the (short-term unstacked) correlation data to .csv files with dv/v measurements.
+The purpose of these objects and scripts is to bring us from (short-term unstacked) ambient noise correlation data to .csv files with dv/v measurements.
 
-When we compute hourly or sub-hourly correlations from continuous ambient noise data, we end up with tens of thousands of individual windows. This module is designed to work on such data contained in hdf5 files with the format that is shown below (hdf5 file format). Correlations in this format are written out directly by the ants module (https://github.com/lermert/ants_2).
+When we compute hourly or sub-hourly correlations from continuous ambient noise data, we end up with tens of thousands of individual windows. This module is designed to work on such data organized in hdf5 files with the format that is shown below ("hdf5 file format"). Correlations in this format are written out directly by the ants module (https://github.com/lermert/ants_2).
 
 
 ### Idea
