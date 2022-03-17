@@ -12,7 +12,7 @@ The central part is the CCDataSet object which itself is a dictionary of CCData 
 Head to https://github.com/lermert/cdmx_dvv where they are put into use. This module is just a bookkeeping device.
 
 
-#### hdf5 file format
+#### hdf5 file format for data
 
 HDF5 "NET.STA.LOCATION.CHANNEL--NET.STA.LOCATION.CHANNEL.ccc.windows.h5" {\
 GROUP "/" {\
@@ -28,7 +28,7 @@ GROUP "/" {\
             CSET H5T_CSET_UTF8;\
             CTYPE H5T_C_S1;\
          }\
-         DATASPACE  SIMPLE { ( NR OF TRACES ) / ( NR OF SAMPLES ) }\
+         DATASPACE  SIMPLE { ( NR OF TRACES ) / ( NR OF TRACES ) }\
       }\
    }\
    DATASET "stats" {\
@@ -62,4 +62,4 @@ GROUP "/" {\
       }\
    }\
 }\
-}\
+}
