@@ -11,10 +11,17 @@ The scripts directory contains three scripts. One is for clustering following Vi
 
 To use the scripts, take these steps: 
 1. Edit the config.yml file. Set do_clustering, do_stacking and do_measurement to true or false. Then, edit all the rest. Do not remove any parameters, just ignore the irrelevant ones (e.g. when do_clustering is false, all parameters relevant to clustering will simply be ignored.). Note that you can run the steps separately, e.g. for doing quality control in between, simply by first setting only do_clustering to true, then setting only do_stacking to true and so on.
-2. Call python \<path-to-ruido-main\>/ruido_main.py \<configfile-name\>
-3. For parallel run, call mpirun -np \<nr-processes\> \<path-to-ruido-main\>/ruido_main.py \<configfile-name\>
+2. Call python \<path-to-ruido-main\>/ruido_main.py \<configfile-name\>. For parallel run, call mpirun -np \<nr-processes\> \<path-to-ruido-main\>/ruido_main.py \<configfile-name\>
 
-You can also use the objects in classes/ interactively to load, filter, stack correlation data.
+You can also interactively use the objects in classes/ to load, filter, stack correlation data. For example:
+```
+from ruido.classes.cc_dataset_serial import CCDataset_serial
+d = CCDataset_serial("filename.h5")
+d.data_to_memory(ix_corr_max=1000)
+print(d)
+d.dataset[0].filter_data(0.1, "bandpass", 2.0, 4.0)
+d.plot_stacks(stacklevel=0)  # stacklevel=0: We have not stacked anything yet. This will plot the raw correlation waveforms in d.dataset[0]
+```
 
 ### Underlying idea
 
