@@ -82,14 +82,8 @@ def run_clustering(config, rank, size, comm):
                 ixs_random = np.arange(dset.dataset[0].ntraces)
             else:
                 raise ValueError("n_samples_each_file must be an integer or \"all\".")
-
-
-            if ixfile == 0:
-                # create dataset on level 1
-                dset.dataset[1] = CCData_serial(dset.dataset[0].data[ixs_random].copy(),
-                                                dset.dataset[0].timestamps[ixs_random].copy(),
-                                                dset.dataset[0].fs)
-            else:
+            
+            try:
                 # keep the randomly selected windows under key 1, 
                 # adding to the previously selected ones
                 dset.dataset[1].data = np.concatenate((dset.dataset[1].data,
@@ -97,6 +91,11 @@ def run_clustering(config, rank, size, comm):
                 dset.dataset[1].timestamps = np.concatenate((dset.dataset[1].timestamps,
                                                              dset.dataset[0].timestamps[ixs_random].copy()))
                 dset.dataset[1].ntraces = dset.dataset[1].data.shape[0]
+            except KeyError:
+                # create dataset on level 1
+                dset.dataset[1] = CCData_serial(dset.dataset[0].data[ixs_random].copy(),
+                                                dset.dataset[0].timestamps[ixs_random].copy(),
+                                                dset.dataset[0].fs)
 
         # now we have collected the randomly selected traces from all files to run the PCA on
         if config["print_debug"]:
