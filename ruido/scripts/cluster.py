@@ -152,8 +152,8 @@ def run_clustering(config, rank, size, comm):
             if dset.dataset[2].data.shape[0] < config["nr_pc"]:
                 print("File has fewer traces than nr_pc, skipping...")
                 continue
-            X = StandardScaler().fit_transform(dset.dataset[2].data)
-            pca_rand = run_pca(X, nr_pc=config["nr_pc"])
+           #X = StandardScaler().fit_transform(dset.dataset[2].data)
+            pca_rand = run_pca(dset.dataset[2].data, nr_pc=config["nr_pc"])
             # pca output is a scikit learn PCA object
             # just for testing, run the Gaussian mixture here
             # gm = gmm(pca_rand.transform(X), range(1, 12))
@@ -185,15 +185,16 @@ def run_clustering(config, rank, size, comm):
                                             window_type="tukey", tukey_alpha=0.5,
                                             cutout=False)
                 dset.dataset[0].data = np.nan_to_num(dset.dataset[0].data)
-                X = StandardScaler().fit_transform(dset.dataset[0].data)
+                #X = StandardScaler().fit_transform(dset.dataset[0].data)
                 # expand the data in the principal component basis:
-                pca_output = pca_rand.transform(X)
+                pca_output = pca_rand.transform(dset.dataset[0].data)
                 # append to the list
                 all_pccs.extend(pca_output)
                 all_timestamps.extend(dset.dataset[0].timestamps)
             all_pccs = np.array(all_pccs)
             all_timestamps = np.array(all_timestamps)
 
+            all_pccs = StandardScaler().fit_transform(all_pccs)
             # do the clustering
             if config["nclustmax"] is not None:
                 try:
