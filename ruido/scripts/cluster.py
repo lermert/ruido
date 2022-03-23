@@ -155,7 +155,7 @@ def run_clustering(config, rank, size, comm):
             if config["scaling_type"] == "standard":
                 X = StandardScaler().fit_transform(dset.dataset[2].data)
             elif config["scaling_type"] == "simple":
-                X = dset.dataset[2].data.copy()
+                X = dset.dataset[2].data
                 for xx in X:
                     xx /= np.abs(xx).max()
 
@@ -198,7 +198,7 @@ def run_clustering(config, rank, size, comm):
                     X = StandardScaler().fit_transform(dset.dataset[0].data)
                 elif config["scaling_type"] == "simple":
                     # simply normalize each trace to unity
-                    X = dset.dataset[0].data.copy()
+                    X = dset.dataset[0].data
                     for tr in X:
                         tr /= np.abs(tr).max()
                     print(X.max())
