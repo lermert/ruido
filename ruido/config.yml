@@ -85,7 +85,7 @@ twin_mid: 0.0
 # halfwidth in terms of longest period
 # or set to "full" to use the entire waveform
 hw_factor: 10
-# scaling type: standard or minmax (to be performed before pca
+# scaling type: standard or simple (to be performed before pca
 # and on the final set of data before clustering)
 scaling_type: standard
 # number of principal components to keep

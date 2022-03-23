@@ -153,7 +153,7 @@ def run_clustering(config, rank, size, comm):
                 continue
 
             if config["scaling_type"] == "standard":
-                X = StandardScaler().fit_transform(dset.dataset[2].data.T).T
+                X = StandardScaler().fit_transform(dset.dataset[2].data)
             elif config["scaling_type"] == "simple":
                 X = dset.dataset[2].data.copy()
                 for xx in X:
@@ -195,7 +195,7 @@ def run_clustering(config, rank, size, comm):
     
                 # expand the data in the principal component basis:
                 if config["scaling_type"] == "standard":
-                    X = StandardScaler().fit_transform(dset.dataset[0].data.T).T
+                    X = StandardScaler().fit_transform(dset.dataset[0].data)
                 elif config["scaling_type"] == "simple":
                     # simply normalize each trace to unity
                     X = dset.dataset[0].data.copy()
@@ -210,10 +210,6 @@ def run_clustering(config, rank, size, comm):
             all_pccs = np.array(all_pccs)
             all_timestamps = np.array(all_timestamps)
 
-            if config["scaling_type"] == "standard":
-                all_pccs = StandardScaler().fit_transform(all_pccs)
-            elif config["scaling_type"] == "minmax":
-                all_pccs = MinMaxScaler().fit_transform(all_pccs)
 
             # do the clustering
             if config["nclustmax"] is not None:
