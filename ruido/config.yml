@@ -74,10 +74,6 @@ n_samples_each_file: 1000
 # if time is longer than 5 years, then
 # cluster_by_file: true is probably advisable
 cluster_by_file: false
-# if cluster by file, then the code will try to re-
-# combine the clusters and sort the largest two into
-# daytime and nighttime
-local_morning_hour: 12
 # clustering is done in windows of the whole cc wave
 # form (assuming that not every wiggle up to very 
 # long lag is important). Windows are symmetric Tukey
@@ -89,6 +85,9 @@ twin_mid: 0.0
 # halfwidth in terms of longest period
 # or set to "full" to use the entire waveform
 hw_factor: 10
+# scaling type: standard or minmax (to be performed before pca
+# and on the final set of data before clustering)
+scaling_type: standard
 # number of principal components to keep
 # integer or float between 0 and 1 or "mle"
 # if integer: This many modes will be kept

@@ -153,11 +153,14 @@ def run_clustering(config, rank, size, comm):
                 continue
 
             if config["scaling_type"] == "standard":
-                X = StandardScaler().fit_transform(dset.dataset[2].data)
-            elif config["scaling_type"] == "minmax":
-                X = MinMaxScaler().fit_transform(dset.dataset[2].data)
+                X = StandardScaler().fit_transform(dset.dataset[2].data.T).T
+            elif config["scaling_type"] == "simple":
+                X = dset.dataset[2].data.copy()
+                for xx in X:
+                    xx /= np.abs(xx).max()
 
-            pca_rand = run_pca(dset.dataset[2].data, nr_pc=config["nr_pc"])
+
+            pca_rand = run_pca(X, nr_pc=config["nr_pc"])
             # pca output is a scikit learn PCA object
             # just for testing, run the Gaussian mixture here
             # gm = gmm(pca_rand.transform(X), range(1, 12))
@@ -192,9 +195,14 @@ def run_clustering(config, rank, size, comm):
     
                 # expand the data in the principal component basis:
                 if config["scaling_type"] == "standard":
-                    X = StandardScaler().fit_transform(dset.dataset[0].data)
-                elif config["scaling_type"] == "minmax":
-                    X = MinMaxScaler().fit_transform(dset.dataset[0].data)
+                    X = StandardScaler().fit_transform(dset.dataset[0].data.T).T
+                elif config["scaling_type"] == "simple":
+                    # simply normalize each trace to unity
+                    X = dset.dataset[0].data.copy()
+                    for tr in X:
+                        tr /= np.abs(tr).max()
+                    print(X.max())
+
                 pca_output = pca_rand.transform(X)
                 # append to the list
                 all_pccs.extend(pca_output)
