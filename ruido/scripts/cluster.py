@@ -157,6 +157,7 @@ def run_clustering(config, rank, size, comm):
             elif config["scaling_type"] == "simple":
                 X = dset.dataset[2].data
                 for xx in X:
+                    xx -= xx.mean()
                     xx /= np.abs(xx).max()
 
 
@@ -200,6 +201,7 @@ def run_clustering(config, rank, size, comm):
                     # simply normalize each trace to unity
                     X = dset.dataset[0].data
                     for tr in X:
+                        tr -= tr.mean()
                         tr /= np.abs(tr).max()
                     print(X.max())
 
