@@ -32,14 +32,12 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
         clay_depth = 0.0
         sed_depth = 0.
         site_type = "hard"
-        print("Hard site")
 
     # SEDIMENT (NO / VERY LITTLE CLAY)
     elif model in ["cdmx_xcvm", "cdmx_unm", "cdmx_UNM", "UNM", "unm", "TEPE", "cdmx_TEPE", "cdmx_thvm"]:
         clay_depth = 0.0
         sed_depth = 100.0
         site_type = "intermediate"
-        print("Intermediate site")
 
     # SEDIMENT (INCL. CLAY)
     elif model in ["cdmx_bjvm",  "cdmx_test"]:
@@ -150,7 +148,8 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
         if z < 0:
             z = 0.
         elif z >=0 and z < z1:
-            dd = z1 - d0
+            dd = z1 - z0
+            
             vs0 = 50.0 
             vp0 = 800.0 
             rho0 = 1250.0 
@@ -163,6 +162,14 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
             qs1 = 115.
             qp1 = 230.
             fluid_volume_fraction1 = 0.2
+
+            if d1 == 0.0:
+                vs0 = vs1 / 2.
+                vp0 = vp1 / 2.
+                qs0 = qs1 / 2.
+                qp0 = qp1 / 2.
+                rho0 = rho1 / 2.
+                fluid_volume_fraction0 = fluid_volume_fraction1 / 2.
 
             vs = vs0 + (vs1 - vs0) / dd * (z - z0)
             vp = vp0 + (vp1 - vp0) / dd * (z - z0)
