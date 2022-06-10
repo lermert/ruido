@@ -154,9 +154,9 @@ class CCData_serial(object):
                              mode="upper", debug_mode=False):
         # select on the basis of relative root mean square amplitude
         # of the cross-correlations
-        if self.data.rms is None:
-            self.data.add_rms()
-        rms = self.data.rms[ixs]
+        if self.rms is None:
+            self.add_rms()
+        rms = self.rms[ixs]
         if mode == "upper":
             ixs_keep = np.where(rms <= np.nanpercentile(rms, perc))
         elif mode == "lower":

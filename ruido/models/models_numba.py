@@ -103,15 +103,15 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
             rho = 2000.
             qs = 115.
             qp = 230.
-            fluid_volume_fraction = 0.2  # using porosity as proxy
+            fluid_volume_fraction = 0.25  # using porosity as proxy
         elif z >= sed_depth / 2 and z < sed_depth:
             vs = 800.
             vp = 2500.
             rho = 2000.
             qs = 115.
             qp = 230
-            fluid_volume_fraction = 0.2  # using porosity as proxy
-        elif z >= sed_depth:
+            fluid_volume_fraction = 0.25  # using porosity as proxy
+        elif z >= sed_depth and z < sed_depth + 1000.0:
             vs = 1050.
             vp = 2600.
             rho = 2000.
@@ -161,7 +161,7 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
             rho1 = 2000.
             qs1 = 115.
             qp1 = 230.
-            fluid_volume_fraction1 = 0.2
+            fluid_volume_fraction1 = 0.25
 
             if d1 == 0.0:
                 vs0 = vs1 / 2.
@@ -192,7 +192,7 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
             rho1 = 2000.
             qs1 = 115.
             qp1 = 230
-            fluid_volume_fraction = 0.2  # using porosity as proxy
+            fluid_volume_fraction = 0.25 # using porosity as proxy
             
             vs = vs0 + (vs1 - vs0) / dd * (z - z1)
             vp = vp0 + (vp1 - vp0) / dd * (z - z1)
@@ -212,7 +212,7 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
             rho1 = 2000.
             qs1 = 115.
             qp1 = 230.
-            fluid_volume_fraction = 0.2  # using porosity as proxy
+            fluid_volume_fraction = 0.25  # using porosity as proxy
             vs = vs0 + (vs1 - vs0) / dd * (z - z2)
             vp = vp0 + (vp1 - vp0) / dd * (z - z2)
             qs = qs0 + (qs1 - qs0) / dd * (z - z2)
@@ -283,5 +283,12 @@ def model_cdmx_discrete(z, model, output="v_rho_q", z_is_radius=False):
         return(rho, A, C, F, L, N, 0., 0.)
     elif output == "v_rho_q":
         return(vs, vp, rho, qs, qp, 0., 0., 0.)
+    elif output == "geotech":
+        if clay_depth == 0.0 and sed_depth > 0.0:
+            return(clay_depth, sed_depth, 400., 2500., 2000., None, None, None)
+        elif clay_depth == 0.0 and sed_depth == 0.0:
+            return(clay_depth, sed_depth, 1050., 2600., 2000., None, None, None)
+        else:
+            return(clay_depth, sed_depth, 50., 800., 1250., None, None, None)
     else:
         return(0., 0., 0., 0., 0., 0., 0., 0.)
