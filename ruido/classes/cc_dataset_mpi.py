@@ -917,7 +917,7 @@ run measure_dvv_ser on one process.")
     def post_whiten(self, f1, f2, stacklevel=0, npts_smooth=5, freq_norm="rma"):
 
         if rank == 0:
-            nfft = int(next_fast_len(2 * self.dataset[stacklevel].npts))
+            # nfft = int(next_fast_len(2 * self.dataset[stacklevel].npts))
             td_taper = cosine_taper(self.dataset[stacklevel].npts, 0.1)
             ndata = len(self.dataset[stacklevel].data)
             nshare = ndata // size
@@ -936,8 +936,8 @@ run measure_dvv_ser on one process.")
             nrest = None
             freq = None
             td_taper = None
-            nfft = None
-        nfft = comm.bcast(nfft, root=0)
+            # nfft = None
+        # nfft = comm.bcast(nfft, root=0)
         fs = comm.bcast(fs, root=0)
         freq = comm.bcast(freq, root=0)
         nshare = comm.bcast(nshare, root=0)
@@ -955,7 +955,7 @@ run measure_dvv_ser on one process.")
         comm.Scatter(to_filter, to_filter_part, root=0)
 
         for i, tr in enumerate(to_filter_part):
-            spec = whiten(td_taper * tr, fft_para)
+            spec, nfft = whiten(td_taper * tr, fft_para)
             to_filter_part[i, :] = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
 
         # pass back
@@ -967,7 +967,7 @@ run measure_dvv_ser on one process.")
             filt_rest = []
             for ixdata in range(ndata - nrest, ndata):
                 tr = self.dataset[stacklevel].data[ixdata, :]
-                spec = whiten(td_taper * tr, fft_para)
+                spec, nfft = whiten(td_taper * tr, fft_para)
                 tr = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
                 filt_rest.append(tr)
             self.dataset[stacklevel].data[ndata - nrest: ndata] = np.array(filt_rest)

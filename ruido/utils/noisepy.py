@@ -42,33 +42,31 @@ SOFTWARE.
 '''
 
 # @jit(nopython = True)
-def moving_ave(A,N):
+def moving_ave(A, N):
     '''
-    this Numba compiled function does running smooth average for an array.
+    running smooth average for an array.
     PARAMETERS:
     ---------------------
     A: 1-D array of data to be smoothed
-    N: integer, it defines the half window length to smooth
+    N: integer, it defines the full window length to smooth
     
     RETURNS:
     ---------------------
     B: 1-D array with smoothed data
     '''
-    A = np.concatenate((A[:N],A,A[-N:]),axis=0)
-    B = np.zeros(A.shape,A.dtype)
-    
-    tmp=0.
-    for pos in range(N,A.size-N):
-        # do summing only once
-        if pos==N:
-            for i in range(-N,N+1):
-                tmp+=A[pos+i]
-        else:
-            tmp=tmp-A[pos-N-1]+A[pos+N]
-        B[pos]=tmp/(2*N+1)
-        if B[pos]==0:
-            B[pos]=1
-    return B[N:-N]
+   # defines an array with N extra samples at either side
+    temp = np.zeros(len(A) + 2 * N)
+    # set the central portion of the array to A
+    temp[N: -N] = A
+    # leading samples: equal to first sample of actual array
+    temp[0: N] = temp[N]
+    # trailing samples: Equal to last sample of actual array
+    temp[-N:] = temp[-N-1]
+    # convolve with a boxcar and normalize, and use only central portion of the result
+    # with length equal to the original array, discarding the added leading and trailing samples
+    B = np.convolve(temp, np.ones(N)/N, mode='same')[N: -N]
+    return(B)
+
 
 def robust_stack(cc_array,epsilon):
     """ 
@@ -154,20 +152,20 @@ def whiten(data, fft_para):
     if high > Nfft/2:
         high = int(Nfft//2)
 
-    FFTRawSign = scipy.fftpack.fft(data, Nfft,axis=axis)
+    FFTRawSign = scipy.fftpack.fft(data, Nfft, axis=axis)
     # Left tapering:
     if axis == 1:
-        FFTRawSign[:,0:low] *= 0
-        FFTRawSign[:,low:left] = np.cos(
+        FFTRawSign[:, 0:low] *= 0
+        FFTRawSign[:, low:left] = np.cos(
             np.linspace(np.pi / 2., np.pi, left - low)) ** 2 * np.exp(
-            1j * np.angle(FFTRawSign[:,low:left]))
+            1j * np.angle(FFTRawSign[:, low:left]))
         # Pass band:
         if freq_norm == 'phase_only':
-            FFTRawSign[:,left:right] = np.exp(1j * np.angle(FFTRawSign[:,left:right]))
+            FFTRawSign[:, left:right] = np.exp(1j * np.angle(FFTRawSign[:, left:right]))
         elif freq_norm == 'rma':
             for ii in range(data.shape[0]):
-                tave = moving_ave(np.abs(FFTRawSign[ii,left:right]),smooth_N)
-                FFTRawSign[ii,left:right] = FFTRawSign[ii,left:right]/tave
+                tave = moving_ave(np.abs(FFTRawSign[ii,left:right]), smooth_N)
+                FFTRawSign[ii,left:right] = FFTRawSign[ii,left:right] / tave
         # Right tapering:
         FFTRawSign[:,right:high] = np.cos(
             np.linspace(0., np.pi / 2., high - right)) ** 2 * np.exp(
@@ -195,8 +193,8 @@ def whiten(data, fft_para):
 
         # Hermitian symmetry (because the input is real)
         FFTRawSign[-(Nfft//2)+1:] = FFTRawSign[1:(Nfft//2)].conjugate()[::-1]
- 
-    return FFTRawSign
+
+    return FFTRawSign, Nfft
 
 
 # @jit(UniTuple(float64, 4)(float64[:], float64[:], float64, int32, float64,

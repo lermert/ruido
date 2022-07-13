@@ -485,14 +485,12 @@ class CCData_serial(object):
 
     def post_whiten(self, f1, f2, npts_smooth=5, freq_norm="rma"):
 
-        nfft = int(next_fast_len(self.npts))
+        # nfft = int(next_fast_len(self.npts))
         td_taper = cosine_taper(self.npts, 0.1)
         to_filter = self.data
         npts = self.npts
         # print(npts)
         fs = self.fs
-        freq = np.fft.fftfreq(n=nfft,
-                              d=1./self.fs)
         fft_para = {"dt": 1./fs,
                     "freqmin": f1,
                     "freqmax": f2,
@@ -500,7 +498,7 @@ class CCData_serial(object):
                     "freq_norm": freq_norm}
 
         for i, tr in enumerate(to_filter):
-            spec = whiten(td_taper * tr, fft_para)
+            spec, nfft = whiten(td_taper * tr, fft_para)
             to_filter[i, :] = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
 
 
