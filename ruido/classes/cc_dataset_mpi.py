@@ -917,29 +917,21 @@ run measure_dvv_ser on one process.")
     def post_whiten(self, f1, f2, stacklevel=0, npts_smooth=5, freq_norm="rma"):
 
         if rank == 0:
-            # nfft = int(next_fast_len(2 * self.dataset[stacklevel].npts))
             td_taper = cosine_taper(self.dataset[stacklevel].npts, 0.1)
             ndata = len(self.dataset[stacklevel].data)
             nshare = ndata // size
             nrest = ndata % size
             to_filter = self.dataset[stacklevel].data[0: ndata - nrest]
             npts = self.dataset[stacklevel].npts
-            # print(npts)
             fs = self.dataset[stacklevel].fs
-            freq = np.fft.fftfreq(n=nfft,
-                                  d=1./fs)
         else:
             nshare = None
             to_filter = None
             npts = None
             fs = None
             nrest = None
-            freq = None
             td_taper = None
-            # nfft = None
-        # nfft = comm.bcast(nfft, root=0)
         fs = comm.bcast(fs, root=0)
-        freq = comm.bcast(freq, root=0)
         nshare = comm.bcast(nshare, root=0)
         nrest = comm.bcast(nrest, root=0)
         npts = comm.bcast(npts, root=0)
