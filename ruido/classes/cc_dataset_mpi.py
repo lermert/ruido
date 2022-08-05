@@ -9,8 +9,9 @@ from scipy.interpolate import interp1d
 from ruido.utils import filter
 from ruido.utils.cc_pol import cc_timeshift
 import os
-from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten,\
+from ruido.utils.noisepy import dtw_dvv, stretching_vect,\
     mwcs_dvv, robust_stack
+from ruido.utils.whiten import whiten
 # from ruido.clustering import cluster, cluster_minibatch
 from obspy.signal.filter import envelope
 from obspy.signal.detrend import polynomial as obspolynomial
@@ -924,6 +925,9 @@ run measure_dvv_ser on one process.")
             to_filter = self.dataset[stacklevel].data[0: ndata - nrest]
             npts = self.dataset[stacklevel].npts
             fs = self.dataset[stacklevel].fs
+            n_smooth = npts_smooth
+            f1 = f1
+            f2 = f2
         else:
             nshare = None
             to_filter = None
@@ -931,24 +935,24 @@ run measure_dvv_ser on one process.")
             fs = None
             nrest = None
             td_taper = None
+            npts_smooth = None
+            f1 = None; f2 = None
         fs = comm.bcast(fs, root=0)
         nshare = comm.bcast(nshare, root=0)
         nrest = comm.bcast(nrest, root=0)
         npts = comm.bcast(npts, root=0)
         to_filter_part = np.zeros((nshare, npts))
         td_taper = comm.bcast(td_taper, root=0)
-        fft_para = {"dt": 1./fs,
-                    "freqmin": f1,
-                    "freqmax": f2,
-                    "smooth_N": npts_smooth,
-                    "freq_norm": freq_norm}
+        n_smooth = comm.bcast(n_smooth, root=0)
+        f1 = comm.bcast(f1, root=0)
+        f2 = comm.bcast(f2, root=0)
 
         # scatter the arrays
         comm.Scatter(to_filter, to_filter_part, root=0)
 
         for i, tr in enumerate(to_filter_part):
-            spec, nfft = whiten(td_taper * tr, fft_para)
-            to_filter_part[i, :] = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
+            spec, nfft = whiten(td_taper * tr, fs, f1, f2, n_smooth)
+            to_filter_part[i, :] = np.fft.irfft(spec, n=nfft)[0: npts]
 
         # pass back
         # gather
@@ -959,8 +963,8 @@ run measure_dvv_ser on one process.")
             filt_rest = []
             for ixdata in range(ndata - nrest, ndata):
                 tr = self.dataset[stacklevel].data[ixdata, :]
-                spec, nfft = whiten(td_taper * tr, fft_para)
-                tr = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
+                spec, nfft = whiten(td_taper * tr, fs, f1, f2, n_smooth)
+                tr = np.fft.irfft(spec, n=nfft)[0: npts]
                 filt_rest.append(tr)
             self.dataset[stacklevel].data[ndata - nrest: ndata] = np.array(filt_rest)
         else:

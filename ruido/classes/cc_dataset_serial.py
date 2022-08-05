@@ -8,8 +8,9 @@ from scipy.fftpack import next_fast_len
 from scipy.interpolate import interp1d
 from ruido.utils import filter
 import os
-from ruido.utils.noisepy import dtw_dvv, stretching_vect, whiten,\
+from ruido.utils.noisepy import dtw_dvv, stretching_vect,\
     mwcs_dvv, robust_stack
+from ruido.utils.whiten import whiten
 # from ruido.clustering import cluster, cluster_minibatch
 from obspy.signal.filter import envelope
 from obspy.signal.detrend import polynomial as obspolynomial
@@ -483,7 +484,7 @@ class CCData_serial(object):
         return(dvv, dvv_times, ccoeff, best_ccoeff, dvv_error)
 
 
-    def post_whiten(self, f1, f2, npts_smooth=5, freq_norm="rma"):
+    def post_whiten(self, f1, f2, npts_smooth=5):
 
         # nfft = int(next_fast_len(self.npts))
         td_taper = cosine_taper(self.npts, 0.1)
@@ -491,15 +492,11 @@ class CCData_serial(object):
         npts = self.npts
         # print(npts)
         fs = self.fs
-        fft_para = {"dt": 1./fs,
-                    "freqmin": f1,
-                    "freqmax": f2,
-                    "smooth_N": npts_smooth,
-                    "freq_norm": freq_norm}
 
         for i, tr in enumerate(to_filter):
-            spec, nfft = whiten(td_taper * tr, fft_para)
-            to_filter[i, :] = np.real(np.fft.ifft(spec, n=nfft)[0: npts])
+            spec, nfft = whiten(td_taper * tr, fs, f1, f2,
+                                n_smooth=npts_smooth)
+            to_filter[i, :] = np.fft.irfft(spec, n=nfft)[0: npts]
 
 
     def interpolate_stacks(self, new_fs):
