@@ -623,11 +623,9 @@ class CCDataset_serial(object):
             v = self.datafile["corr_windows"]["data"][i]
             tstamp = self.datafile["corr_windows"]["timestamps"][i]
             data[i - ix_corr_min, :] = v
-
             if tstamp == "":
                 # leave timestamp as 0, will get dropped
                 continue
-
             if type(tstamp) in [np.float64, np.float32, float]:
                 timestamps[i - ix_corr_min] = tstamp
             else:
@@ -718,7 +716,7 @@ class CCDataset_serial(object):
                     plot_mode="heatmap", seconds_to_start=0.0, cmap=plt.cm.bone,
                     mask_gaps=False, step=None, figsize=None,
                     color_by_cc=False, normalize_all=False, label_style="month",
-                    ax=None, plot_envelope=False, ref=None,
+                    ax=None, plot_envelope=False, ref=None, color_by_clusterlabel=False,
                     mark_17_quake=False, grid=True, marklags=[], colorful_traces=False):
         if mask_gaps and step == None:
             raise ValueError("To mask the gaps, you must provide the step between successive windows.")
@@ -738,6 +736,7 @@ class CCDataset_serial(object):
         ylabelticks = []
         months = []
         years = []
+        jdays = []
 
         if ax is None:
             fig = plt.figure(figsize=figsize)
@@ -778,6 +777,11 @@ class CCDataset_serial(object):
                         ylabelticks.append(UTCDateTime(t).strftime("%Y./%m/%d"))
                         ylabels.append(scale_factor_plotting * cnt)
                         years.append(UTCDateTime(t).strftime("%Y"))
+                elif label_style == "jday":
+                    if UTCDateTime(t).strftime("%Y%j") not in jdays:
+                        ylabelticks.append(UTCDateTime(t).strftime("%Y.%j"))
+                        ylabels.append(scale_factor_plotting * cnt)
+                        jdays.append(UTCDateTime(t).strftime("%Y%j"))
                 cnt += 1
 
             if ref is not None:
@@ -811,6 +815,12 @@ class CCDataset_serial(object):
                             ylabels.append(t)
                             ylabelticks.append(UTCDateTime(t).strftime("%Y/%m/%d"))
                             years.append(UTCDateTime(t).strftime("%Y"))
+                    
+                    elif label_style == "jday":
+                        if UTCDateTime(t).strftime("%Y%j") not in jdays:
+                            ylabelticks.append(UTCDateTime(t).strftime("%Y.%j"))
+                            ylabels.append(t)
+                            jdays.append(UTCDateTime(t).strftime("%Y%j"))
 
                         
                 if plot_envelope:
@@ -826,10 +836,12 @@ class CCDataset_serial(object):
                 t_to_plot_all = np.arange(tstamp0, tstamp1 + step, step=step)
                 dat_mat = np.zeros((len(t_to_plot_all), self.dataset[stacklevel].npts))
                 dat_mat[:, :] = np.nan
+                cluster_labels_plotting = np.ones(len(t_to_plot_all), dtype=np.int) * -1
         
                 for ix, tr in enumerate(to_plot):
                     t = t_to_plot[ix]
                     ix_t = np.argmin(np.abs(t_to_plot_all - t))
+                    cluster_labels_plotting[ix_t] = self.dataset[stacklevel].cluster_labels[ix]
                     if normalize_all:
                         dat_mat[ix_t, :] = tr / tr.max()
                     else:
@@ -847,7 +859,11 @@ class CCDataset_serial(object):
                             ylabels.append(t_to_plot_all[ix_t])
                             ylabelticks.append(UTCDateTime(t).strftime("%Y/%m/%d"))
                             years.append(UTCDateTime(t).strftime("%Y"))
-                   
+                    elif label_style == "jday":
+                        if UTCDateTime(t).strftime("%Y%j") not in jdays:
+                            ylabelticks.append(UTCDateTime(t).strftime("%Y.%j"))
+                            ylabels.append(t_to_plot_all[ix_t])
+                            jdays.append(UTCDateTime(t).strftime("%Y%j"))
                 if plot_envelope:
                     vmin = 0
                     vmax = scale_factor_plotting * np.nanmax(dat_mat)
@@ -855,8 +871,14 @@ class CCDataset_serial(object):
                     vmin = -scale_factor_plotting * np.nanmax(dat_mat)
                     vmax = scale_factor_plotting * np.nanmax(dat_mat)
                 t_to_plot = t_to_plot_all
+            
+           
             ax1.pcolormesh(lag, t_to_plot, dat_mat, vmax=vmax, vmin=vmin,
-                           cmap=cmap)
+                            cmap=cmap)
+            if color_by_clusterlabel:
+                ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_start, t_to_plot, c=cluster_labels_plotting, marker=".", cmap=plt.cm.rainbow)
+                ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_show, t_to_plot, c=cluster_labels_plotting, marker=".", cmap=plt.cm.rainbow)
+                
 
         if mark_17_quake:
             ylabels.append(UTCDateTime("2017,262").timestamp)
