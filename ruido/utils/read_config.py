@@ -15,8 +15,12 @@ tuples of fmin, fmax"
     
     # ADDITIONAL DERIVED PARAMETERS
     if config["reference_type"] == "inversion":
-        config["badwins"] = [[UTCDateTime(bt) for bt in entr] \
+        if config["skiptimes_inversion"] is not None:
+            config["badwins"] = [[UTCDateTime(bt) for bt in entr] \
                               for entr in config["skiptimes_inversion"]]
+        else:
+            config["badwins"] = []
+
     elif config["reference_type"] == "bootstrap":
         config["r_duration"] = config["reference_length_days"] * 86400.
     elif config["reference_type"] == "list":

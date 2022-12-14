@@ -16,7 +16,7 @@ def run_measure(config, rank, size, comm):
     if config["print_debug"]:
         print("Rank {} is working on measurement.".format(rank))
 
-
+    corrtype = config["correlation_type"]
     # loop over stations and channels, to produce 1 output file per channel
     for sta in config["stations"]:
 
@@ -24,7 +24,8 @@ def run_measure(config, rank, size, comm):
             for ch2 in config["channels"]:
 
 
-                input_files = glob(os.path.join(config["stack_dir"], "*.{}.*.{}--*.{}.*.{}.ccc.stacks_*.h5".format(sta, ch1, sta, ch2)))
+                input_files = glob(os.path.join(config["stack_dir"], "*.{}.*.{}--*.{}.*.{}.{}.stacks_*.h5".format(sta, ch1, sta, ch2, corrtype)))
+                print(os.path.join(config["stack_dir"], "*.{}.*.{}--*.{}.*.{}.{}.stacks_*.h5".format(sta, ch1, sta, ch2, corrtype)))
                 input_files.sort()
 
                 if config["print_debug"] and rank == 0:
@@ -35,55 +36,38 @@ def run_measure(config, rank, size, comm):
                     continue
 
 
+                # start a new output table.
+                output = pd.DataFrame(columns=["timestamps", "t0_s", "t1_s", "f0_Hz",  "f1_Hz",
+                                               "tag", "dvv_max", "dvv", "cc_before", "cc_after",
+                                               "dvv_err", "cluster"])
+                
+                
                 # For each input file:
-                # check if we are looking at another channel pair than before, if so: write output
-                # and start a new output table.
                 # Read in the stacks
                     # For each time window:
                     # measurement
                     # save the result
-                    # set up the dataframe to collect the results
-                output = pd.DataFrame(columns=["timestamps", "t0_s", "t1_s", "f0_Hz",  "f1_Hz",
-                                               "tag", "dvv_max", "dvv", "cc_before", "cc_after",
-                                               "dvv_err", "cluster"])
 
                 for iinf, input_file in enumerate(input_files):
-                    #ixf = int(os.path.splitext(input_file)[0].split("_")[-2][2:])
                     f0 = float(input_file.split("_")[-2].split("-")[0])
                     f1 = float(input_file.split("_")[-2].split("-")[-1][:-2])
                     freq_band = [f0, f1]
-                    freqs0 = [freqs[0] for freqs in config["freq_bands"]]
-                    freqs1 = [freqs[1] for freqs in config["freq_bands"]]
-                    print(freqs0)
-                    ixft = np.where(np.array(freqs0) == f0)
-                    ixf = np.intersect1d(np.where(np.array(freqs1) == f1), ixft)[0]
-                    if not config["freq_bands"][ixf] == freq_band:
-                        continue
+                    
+                    # check if the frequency band of the file is among the ones that should be measured
+                    if freq_band not in config["freq_bands"]: continue
+
+                    
                     if config["use_clusters"]:
-                        cl_label = int(os.path.splitext(input_file)[0].split("_")[-1][2:])
+                        try:
+                            cl_label = int(os.path.splitext(input_file)[0].split("_")[-1][2:])
+                        except ValueError:
+                            assert type(os.path.splitext(input_file)[0].split("_")[-1][2:]) == str
+                            continue
+
                     station1 = os.path.basename(input_file.split(".")[1])
                     station2 = os.path.basename(input_file.split(".")[4])
 
-                    #ch1 = os.path.basename(input_file.split(".")[3][0: 3])
-                    assert station1 == sta
-                    assert ch2 == os.path.basename(input_file.split(".")[6])
                     ch_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
-                    # if iinf == 0:
-                    #     ch_id_prev = ch_id
-
-                    # if ch_id != ch_id_prev:
-                    #     # if this is a new channel, write all to file,
-                    #     # and start a fresh output table
-                    #     if rank == 0:
-                    #         outfile_name = "{}_{}_{}.csv".format(ch_id, config["measurement_type"],
-                    #                                              config["reference_type"])
-                    #         output.to_csv(os.path.join(config["msr_dir"], outfile_name))
-                    #         output = pd.DataFrame(columns=["timestamps", "t0_s", "t1_s", "f0_Hz",  "f1_Hz",
-                    #                                        "tag", "dvv_max", "dvv", "cc_before", "cc_after",
-                    #                                        "dvv_err", "cluster"])
-                    #     ch_id_prev = ch_id
-
-                    #freq_band = config["freq_bands"][ixf]
 
                     # read into memory
                     dset = CCDataset(input_file)
@@ -96,7 +80,10 @@ def run_measure(config, rank, size, comm):
 
                     # find max. dvv that will just be short of a cycle skip
                     # then extend by skipfactor
+                    ixf = config["freq_bands"].index(freq_band)
                     for twin in config["twins"][ixf]:
+
+                        # get the time window for this station pair
                         if rank == 0:
                             print("Measurement window {}, {} s...".format(*twin))
                         else:

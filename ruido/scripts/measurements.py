@@ -1,54 +1,142 @@
 import numpy as np
 import pandas as pd
+from scipy import sparse
 from obspy import UTCDateTime
 from ruido.classes.cc_dataset_mpi import CCData
+import sys
+np.set_printoptions(threshold=sys.maxsize)
+
 
 def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
+    size = comm.Get_size()
+
     if rank == 0:
         tstmps = dset.dataset[1].timestamps
         # cut out times where the station wasn't operating well
         # define in measurement_config.yml
         bad_ixs = []
+
         for badwindow in conf["badwins"]:
             ixbw1 = np.argmin((tstmps - badwindow[0]) ** 2)
             ixbw2 = np.argmin((tstmps - badwindow[1]) ** 2)
             bad_ixs.extend(list(np.arange(ixbw1, ixbw2)))
 
         good_windows = [ixwin for ixwin in range(len(tstmps)) if not ixwin in bad_ixs]
-        data = dset.dataset[1].data[good_windows]
-        tstmps = dset.dataset[1].timestamps[good_windows]
-        dset.dataset[2] = CCData(data, tstmps, dset.dataset[1].fs)
+
+        stacks = dset.dataset[1].data[good_windows]
+        timestamps = dset.dataset[1].timestamps[good_windows]
+        fs = dset.dataset[1].fs
+        dset.dataset[2] = CCData(stacks, timestamps, fs)
         n = len(dset.dataset[2].timestamps)
-        k = int(n * (n - 1) / 2.)
+        k = n * (n - 1) // 2
         data_dvv = np.zeros(k)
         data_dvv_err = np.zeros(k)
     else:
         n = 0
-
+        stacks = None
+        timestamps = None
+        fs = 0
+    
+    timestamps = comm.bcast(timestamps, root=0)
+    stacks = comm.bcast(stacks, root=0)
+    fs = comm.bcast(fs, root=0)
     n = comm.bcast(n, root=0)
-    counter = 0
-    for i in range(n):
-        # i-th stack as reference
-        if rank == 0:
-            ref = dset.dataset[2].data[i, :]
-        else:
-            ref = None
-        ref = comm.bcast(ref, root=0)
+    
+    # inverse problem to set up
+    d_vector = np.zeros(k)
+    ix_d = 0
+    G = np.zeros((k, n), dtype=int)  # replace by scipy sparse array in the future
+    Cov_d = np.zeros(k)   # assume diagonal covariance matrix for data,
+    # i.e. independence,
+    # not sure if that is good but I think that's how everyone handles it
 
-        dvv, dvv_timest, ccoeff, \
-            best_ccoeff, dvv_error = dset.measure_dvv_par(f0=freq_band[0], f1=freq_band[1], ref=ref, stacklevel=2,
-                                                          ngrid=100, method=conf["measurement_type"],
-                                                          dvv_bound=maxdvv, moving_window_length=2./freq_band[0],
-                                                          moving_window_step=1./freq_band[0])
-        comm.barrier()
-        if rank == 0:
-            for j in range(i + 1, n):
-                data_dvv[counter] = dvv[j]
-                data_dvv_err[counter] = dvv_error[j]
-                counter += 1
+    for ix_ref, ref in enumerate(stacks[:-1]):
+        t = np.zeros(n - ix_ref - 1)
+        dvv = np.zeros(n - ix_ref - 1)
+        cc0 = np.zeros(n - ix_ref -1)
+        cc1 = np.zeros(n - ix_ref - 1)
+        err = np.zeros(n - ix_ref - 1)
+
+        if rank > 0:
+            dset.dataset[2] = CCData(stacks, timestamps, fs)
+
         else:
             pass
-    return(dvv_timest, dvv, ccoeff, best_ccoeff, dvv_error, None)
+
+        for ixcnt, ix in enumerate(range(ix_ref + 1 + rank, n, size)):
+            dvvp, dvv_timestp, ccoeffp, \
+                best_ccoeffp, dvv_errorp, = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
+                                                 ref=ref, ngrid=conf["ngrid"], stacklevel=2,
+                                                 method=conf["measurement_type"], indices=[ix],
+                                                 dvv_bound=conf["maxdvv"], twin0=twin[0], twin1=twin[1]
+                                                 )
+            # print(ix_ref, ix, dvvp)
+            t[rank + size * ixcnt] = dvv_timestp[0]
+            dvv[rank + size * ixcnt] = dvvp[0]
+            cc0[rank + size * ixcnt] = ccoeffp[0]
+            cc1[rank + size * ixcnt] = best_ccoeffp[0]
+            err[rank + size * ixcnt] = dvv_errorp[0]
+
+        comm.barrier()
+
+        # now collect
+        if rank == 0:
+            dvv_all = dvv.copy()
+            t_all = t.copy()
+            err_all = err.copy()
+
+            for other_rank in range(1, size):
+                comm.Recv(t, source=other_rank, tag=77)
+                t_all += t
+                comm.Recv(dvv, source=other_rank, tag=78)
+                dvv_all += dvv
+                comm.Recv(err, source=other_rank, tag=81)
+                err_all += err
+        else:
+            comm.Send(t, dest=0, tag=77)
+            comm.Send(dvv, dest=0, tag=78)
+            comm.Send(err, dest=0, tag=81)
+
+        comm.barrier()
+        if rank == 0:
+            # print("Ixd current: ", ix_d)
+            d_vector[ix_d: ix_d + n - (ix_ref + 1)] = dvv
+            Cov_d[ix_d: ix_d + n - (ix_ref + 1)] = err
+            G[ix_d: ix_d + n - (ix_ref + 1), ix_ref] = -1
+            for ii in range(0, n - ix_ref - 1):
+                G[ix_d + ii, ix_ref + ii + 1] = 1
+            # G[ix_d: ix_d + n - (ix_ref + 1), [ix_ref + ii for ii in range(1, n - ix_ref)]] = 1
+            ix_d += n - (ix_ref + 1)
+        else:
+            pass
+    # print(G)
+    # print(d_vector, "d")
+    
+    # after the loop over references (which filled in d, Cov_d and for convenience also G):
+    # determine model covariance
+    if rank == 0:
+        i_mod = range(n); j_mod = range(n); i_modv, j_modv = np.meshgrid(i_mod, j_mod, indexing="ij")
+        Cov_m = np.exp(-np.abs(i_modv - j_modv) / (2. * conf["brenguier_beta"]))
+        # solve the inverse problem and return the result
+        # figure out alpha
+        
+        term_00 = np.dot(np.diag(1. / Cov_d), G)
+        term_0 = np.matmul(G.T, term_00)
+
+        alpha = np.sum(term_0) / np.sum(np.linalg.inv(Cov_m))
+        print(alpha)
+        term_1 = term_0 + alpha * np.linalg.inv(Cov_m)
+        term_2 = np.matmul(G.T, np.matmul(np.diag(1. / Cov_d), d_vector))
+        # Cmpost
+        Cov_m_post = np.linalg.inv(term_1)
+        # mpost
+        m_post = np.matmul(Cov_m_post, term_2)
+        # resolution matrix
+        resol = np.matmul(Cov_m_post, np.matmul(G.T, np.matmul(np.diag(1. / Cov_d), G))) 
+
+        return(timestamps, m_post, None, Cov_m_post, resol, None)
+    else:
+        return 
 
 def measurement_incremental(dset, config, twin, freq_band, rank, comm,
                             stacklevel=1):

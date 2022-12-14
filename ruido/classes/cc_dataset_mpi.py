@@ -745,7 +745,7 @@ run measure_dvv_ser on one process.")
             return([],[],[],[],[],[])
 
     def measure_dvv_ser(self, ref, f0, f1, stacklevel=1, method="stretching",
-                        ngrid=90, dvv_bound=0.03,
+                        ngrid=90, dvv_bound=0.03, twin0=None, twin1=None,
                         measure_smoothed=False, indices=None,
                         moving_window_length=None, moving_window_step=None,
                         maxlag_dtw=0.0,
@@ -763,7 +763,12 @@ run measure_dvv_ser on one process.")
         reference = ref.copy()
         para = {}
         para["dt"] = 1. / fs
-        para["twin"] = [lag[0], lag[-1] + 1. / fs]
+        if twin0 is None and twin1 is None:
+            para["twin"] = [lag[0], lag[-1] + 1. / fs]
+        elif twin0 is None:
+            para["twin"] = [lag[0], twin1]
+        else:
+            para["twin"] = [twin0, twin1]
         para["freq"] = [f0, f1]
 
         if indices is None:
