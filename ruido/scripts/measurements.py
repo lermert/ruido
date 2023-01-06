@@ -4,6 +4,7 @@ from scipy import sparse
 from obspy import UTCDateTime
 from ruido.classes.cc_dataset_mpi import CCData
 import sys
+import matplotlib.pyplot as plt
 np.set_printoptions(threshold=sys.maxsize)
 
 
@@ -28,9 +29,6 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
         fs = dset.dataset[1].fs
         dset.dataset[2] = CCData(stacks, timestamps, fs)
         n = len(dset.dataset[2].timestamps)
-        k = n * (n - 1) // 2
-        data_dvv = np.zeros(k)
-        data_dvv_err = np.zeros(k)
     else:
         n = 0
         stacks = None
@@ -39,8 +37,10 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
     
     timestamps = comm.bcast(timestamps, root=0)
     stacks = comm.bcast(stacks, root=0)
+    # print("stacks ", stacks.shape)
     fs = comm.bcast(fs, root=0)
     n = comm.bcast(n, root=0)
+    k = n * (n - 1) // 2
     
     # inverse problem to set up
     d_vector = np.zeros(k)
@@ -53,9 +53,9 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
     for ix_ref, ref in enumerate(stacks[:-1]):
         t = np.zeros(n - ix_ref - 1)
         dvv = np.zeros(n - ix_ref - 1)
-        cc0 = np.zeros(n - ix_ref -1)
-        cc1 = np.zeros(n - ix_ref - 1)
         err = np.zeros(n - ix_ref - 1)
+        cc1 = np.zeros(n - ix_ref - 1)
+
 
         if rank > 0:
             dset.dataset[2] = CCData(stacks, timestamps, fs)
@@ -73,9 +73,8 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
             # print(ix_ref, ix, dvvp)
             t[rank + size * ixcnt] = dvv_timestp[0]
             dvv[rank + size * ixcnt] = dvvp[0]
-            cc0[rank + size * ixcnt] = ccoeffp[0]
-            cc1[rank + size * ixcnt] = best_ccoeffp[0]
             err[rank + size * ixcnt] = dvv_errorp[0]
+            cc1[rank + size * ixcnt] = best_ccoeffp[0]
 
         comm.barrier()
 
@@ -84,24 +83,29 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
             dvv_all = dvv.copy()
             t_all = t.copy()
             err_all = err.copy()
-
+            cc1_all = cc1.copy()
+            
             for other_rank in range(1, size):
                 comm.Recv(t, source=other_rank, tag=77)
                 t_all += t
                 comm.Recv(dvv, source=other_rank, tag=78)
                 dvv_all += dvv
-                comm.Recv(err, source=other_rank, tag=81)
+                comm.Recv(err, source=other_rank, tag=79)
                 err_all += err
+                comm.Recv(cc1, source=other_rank, tag=80)
+                cc1_all += cc1
+                
         else:
             comm.Send(t, dest=0, tag=77)
             comm.Send(dvv, dest=0, tag=78)
-            comm.Send(err, dest=0, tag=81)
+            comm.Send(err, dest=0, tag=79)
+            comm.Send(cc1, dest=0, tag=80)
 
         comm.barrier()
         if rank == 0:
             # print("Ixd current: ", ix_d)
-            d_vector[ix_d: ix_d + n - (ix_ref + 1)] = dvv
-            Cov_d[ix_d: ix_d + n - (ix_ref + 1)] = err
+            d_vector[ix_d: ix_d + n - (ix_ref + 1)] = dvv_all
+            Cov_d[ix_d: ix_d + n - (ix_ref + 1)] = err_all
             G[ix_d: ix_d + n - (ix_ref + 1), ix_ref] = -1
             for ii in range(0, n - ix_ref - 1):
                 G[ix_d + ii, ix_ref + ii + 1] = 1
@@ -109,8 +113,6 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
             ix_d += n - (ix_ref + 1)
         else:
             pass
-    # print(G)
-    # print(d_vector, "d")
     
     # after the loop over references (which filled in d, Cov_d and for convenience also G):
     # determine model covariance
@@ -118,25 +120,25 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
         i_mod = range(n); j_mod = range(n); i_modv, j_modv = np.meshgrid(i_mod, j_mod, indexing="ij")
         Cov_m = np.exp(-np.abs(i_modv - j_modv) / (2. * conf["brenguier_beta"]))
         # solve the inverse problem and return the result
-        # figure out alpha
-        
-        term_00 = np.dot(np.diag(1. / Cov_d), G)
+        term_00 = np.matmul(np.diag(1. / Cov_d), G)
+        print("Cdinv G ", term_00.shape)
         term_0 = np.matmul(G.T, term_00)
-
-        alpha = np.sum(term_0) / np.sum(np.linalg.inv(Cov_m))
-        print(alpha)
+        # figure out alpha
+        alpha = np.max(term_0) / np.max(np.linalg.inv(Cov_m))
         term_1 = term_0 + alpha * np.linalg.inv(Cov_m)
         term_2 = np.matmul(G.T, np.matmul(np.diag(1. / Cov_d), d_vector))
+
         # Cmpost
         Cov_m_post = np.linalg.inv(term_1)
+
         # mpost
         m_post = np.matmul(Cov_m_post, term_2)
-        # resolution matrix
-        resol = np.matmul(Cov_m_post, np.matmul(G.T, np.matmul(np.diag(1. / Cov_d), G))) 
 
-        return(timestamps, m_post, None, Cov_m_post, resol, None)
+        # resolution matrix, not currently used
+        # resol = np.matmul(Cov_m_post, np.matmul(G.T, np.matmul(np.diag(1. / Cov_d), G))) 
+        return(timestamps, m_post, np.ones(len(timestamps)) * np.nan, np.ones(len(timestamps)) * np.nan, np.diag(Cov_m_post), None)
     else:
-        return 
+        return([], [], [], [], [], [])
 
 def measurement_incremental(dset, config, twin, freq_band, rank, comm,
                             stacklevel=1):
@@ -518,8 +520,10 @@ def run_measurement(corrstacks, conf, twin, freq_band, rank, comm):
                 tag = np.nan
             else:
                 tag = tags[i]
+            
             output.loc[i] = [t[i], twin[0], twin[1], freq_band[0], freq_band[1],
-                             tag, conf["maxdvv"], dvv[i], cc0[i], cc1[i], err[i]]
+                                tag, conf["maxdvv"], dvv[i], cc0[i], cc1[i], err[i]]
+                
         return(output)
     else:
         return(None)

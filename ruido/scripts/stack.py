@@ -106,10 +106,10 @@ def run_stacking(config, rank, size, comm):
                             continue
 
                         input_files = glob(os.path.join(config["input_directories"],
-                                                        "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
+                                                        "*.{}.*.{}--*.{}.*.{}.*{}.windows.h5".format(station1,
                                                                                           ch1,
                                                                                           station2,
-                                                                                          ch2)))
+                                                                                          ch2, config["correlation_type"])))
                         if len(input_files) == 0:
                             if config["print_debug"] and rank == 0:
                                 print("No input for this channel.")
@@ -134,6 +134,7 @@ def run_stacking(config, rank, size, comm):
                         dset = CCDataset(input_files[0])
 
                         for i, f in enumerate(input_files):
+                            ctype = os.path.basename(f).split(".")[7]
                             if i == 0:
                                 network = os.path.basename(f).split(".")[0]
                                 dset.data_to_memory()
@@ -187,8 +188,8 @@ def run_stacking(config, rank, size, comm):
                                     cltag = "_cl{}".format(stacklevel)
                                 else:
                                     cltag = "_noclust"
-                                outfile = "{}.{}..{}--{}.{}..{}.ccc.stacks_{}days_{}-{}_{}-{}Hz{}.h5".format(
-                                    network, station1, ch1, network, station2, ch2, config["duration"]//86400,
+                                outfile = "{}.{}..{}--{}.{}..{}.{}.stacks_{}days_{}-{}_{}-{}Hz{}.h5".format(
+                                    network, station1, ch1, network, station2, ch2, ctype, config["duration"]//86400,
                                     UTCDateTime(config["t0"]).strftime("%Y"),
                                     UTCDateTime(config["t1"]).strftime("%Y"),
                                     freq_band[0], freq_band[1], cltag)

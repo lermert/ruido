@@ -331,7 +331,7 @@ def stretching_vect(ref, cur, dv_range, nbtrial, para):
     tmax = np.max(twin)
     fmin = np.min(freq)
     fmax = np.max(freq)
-    tvec = np.arange(tmin, tmax, dt)
+    tvec = np.arange(tmin, tmax + dt, dt)
 
     # make useful one for measurements
     dvmin = -np.abs(dv_range)
@@ -343,7 +343,7 @@ def stretching_vect(ref, cur, dv_range, nbtrial, para):
     waveforms[0, :] = ref
     # nt = np.array(nbtrial * [tvec])
     # nt = np.multiply(nt.transpose(), Eps).transpose()
-
+    # print(waveforms.shape, tvec.shape, cur.shape, ref.shape)
     # Set of stretched/compressed current waveforms
     for ii in range(nbtrial):
         nt = tvec * Eps[ii]

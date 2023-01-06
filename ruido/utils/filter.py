@@ -38,7 +38,7 @@ Various Seismogram Filtering Functions from obspy
 def get_window(t_mid, hw, lag, window_type, alpha=0.2):
 
     # half_lag_minus_one = int((self.npts - 1) / 2)
-    ix_1 = np.argmin(abs(lag - t_mid - hw))
+    ix_1 = np.argmin(abs(lag - t_mid - hw)) + 1
     ix_0 = np.argmin(abs(lag - t_mid + hw))
     win = np.zeros(lag.shape)
     if window_type == "hann":

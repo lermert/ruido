@@ -30,6 +30,9 @@ channels:
 - HHZ
 - HHN
 - HHE
+# correlation type: "inherited" from ants, ccc or pcc
+# for classical vs. phase cross-correlation
+correlation_type: ccc
 # drop autocorrelations: if true, then all auto-
 # correlations (like BHE-BHE, BHN-BHN) etc will be 
 # ignored.

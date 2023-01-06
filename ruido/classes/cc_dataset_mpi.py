@@ -301,11 +301,12 @@ class CCData(object):
         else:
             new_win_dat = []
             for ix in range(to_window.shape[0]):
-                ix_to_keep = np.where(win > 0.0)
+                ix_to_keep = np.where(win > 0.0)[0]
                 new_win_dat.append(to_window[ix, ix_to_keep])
             newlag = self.lag[ix_to_keep]
             self.lag = newlag
             self.data = np.array(new_win_dat)
+            print(self.data.shape)
             self.npts = len(ix_to_keep)
 
     def interpolate_stacks(self, new_fs):
