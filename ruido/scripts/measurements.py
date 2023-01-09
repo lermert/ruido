@@ -28,18 +28,22 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
         timestamps = dset.dataset[1].timestamps[good_windows]
         fs = dset.dataset[1].fs
         dset.dataset[2] = CCData(stacks, timestamps, fs)
+        dset.dataset[2].lag = dset.dataset[1].lag
+        lag2 = dset.dataset[2].lag
         n = len(dset.dataset[2].timestamps)
     else:
         n = 0
         stacks = None
         timestamps = None
         fs = 0
+        lag2 = None
     
     timestamps = comm.bcast(timestamps, root=0)
     stacks = comm.bcast(stacks, root=0)
     # print("stacks ", stacks.shape)
     fs = comm.bcast(fs, root=0)
     n = comm.bcast(n, root=0)
+    lag2 = comm.bcast(lag2, root=0)
     k = n * (n - 1) // 2
     
     # inverse problem to set up
@@ -59,6 +63,7 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
 
         if rank > 0:
             dset.dataset[2] = CCData(stacks, timestamps, fs)
+            dset.dataset[2].lag = lag2
 
         else:
             pass
