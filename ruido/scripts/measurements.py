@@ -64,6 +64,8 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
             pass
 
         for ixcnt, ix in enumerate(range(ix_ref + 1 + rank, n, size)):
+            print(twin)
+            print(dset.dataset[2].lag[0], dset.dataset[2].lag[-1])
             dvvp, dvv_timestp, ccoeffp, \
                 best_ccoeffp, dvv_errorp, = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
                                                  ref=ref, ngrid=conf["ngrid"], stacklevel=2,

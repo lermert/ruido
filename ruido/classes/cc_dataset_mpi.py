@@ -286,7 +286,7 @@ class CCData(object):
     def window_data(self, t_mid, hw, window_type="tukey",
                     tukey_alpha=0.2, cutout=False):
         if rank != 0:
-            raise ValueError("Call this function only on one process.Sorry")
+            raise ValueError("Call this function only on one process. Sorry")
         # check that the input array has 2 dimensions
         to_window = self.data
         lag = self.lag
