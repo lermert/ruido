@@ -38,8 +38,17 @@ Various Seismogram Filtering Functions from obspy
 def get_window(t_mid, hw, lag, window_type, alpha=0.2):
 
     # half_lag_minus_one = int((self.npts - 1) / 2)
-    ix_1 = np.argmin(abs(lag - t_mid - hw)) + 1
-    ix_0 = np.argmin(abs(lag - t_mid + hw))
+    #ix_1 = np.argmin(abs(lag - t_mid - hw)) + 1
+    #ix_0 = np.argmin(abs(lag - t_mid + hw))
+
+    # find closest sample to center of window
+    ix_c = np.argmin(abs(lag - t_mid))
+    delta = np.diff(lag).mean()
+    hw_samples = int(round(hw / delta))
+
+    ix_0 = ix_c - hw_samples
+    ix_1 = ix_c + hw_samples + 1  # account for one central sample
+
     win = np.zeros(lag.shape)
     if window_type == "hann":
         win[ix_0: ix_1] = hann(ix_1 - ix_0)
