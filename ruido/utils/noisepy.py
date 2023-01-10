@@ -327,8 +327,9 @@ def stretching_vect(ref, cur, dv_range, nbtrial, para):
     twin = para['twin']
     freq = para['freq']
     dt   = para['dt']
-    tmin = np.min(twin)
-    tmax = np.max(twin)
+    n_dec = len(str(1./dt))
+    tmin = round(np.min(twin), n_dec)
+    tmax = round(np.max(twin), n_dec)
     fmin = np.min(freq)
     fmax = np.max(freq)
     tvec = np.arange(tmin, tmax + dt, dt)

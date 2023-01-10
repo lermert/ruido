@@ -90,10 +90,6 @@ def run_measure(config, rank, size, comm):
                         # define the time windows:
                         # time offset
                         offset_t = dist / config["wave_velocity_mps"]
-                        # here, we fix the offset to the nearest sample. If not, it's a mess to window the data
-                        print(offset_t)
-                        offset_t = dset.dataset[0].lag[np.argmin(np.abs(dset.dataset[0].lag - offset_t))]
-                        print(offset_t)
 
                         # time window half-width
                         longest_T = 1. / min(freq_band)
@@ -103,7 +99,9 @@ def run_measure(config, rank, size, comm):
                         # time windows
                         twins = []
                         for offset_t in offset_ts:
-                            twins.extend([[offset_t, offset_t + 2*whw] for whw in win_hw])
+                            # avoid precision issues
+                            n_dec = len(str(dset.dataset[0].fs)) + 1
+                            twins.extend([[round(offset_t, n_dec), round(offset_t + 2*whw, n_dec)] for whw in win_hw])
 
                         if sta1 != sta2 or ch1 != ch2:
                             twins.extend([[-twin[1], -twin[0]] for twin in twins])
