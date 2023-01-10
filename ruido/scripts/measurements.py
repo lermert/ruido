@@ -27,9 +27,7 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
         stacks = dset.dataset[1].data[good_windows]
         timestamps = dset.dataset[1].timestamps[good_windows]
         fs = dset.dataset[1].fs
-        dset.dataset[2] = CCData(stacks, timestamps, fs)
-        dset.dataset[2].lag = dset.dataset[1].lag
-        lag2 = dset.dataset[2].lag
+        lag2 = dset.dataset[1].lag.copy()
         n = len(dset.dataset[2].timestamps)
     else:
         n = 0
@@ -54,19 +52,14 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
     # i.e. independence,
     # not sure if that is good but I think that's how everyone handles it
 
+    dset.dataset[2] = CCData(stacks, timestamps, fs)
+    dset.dataset[2].lag = lag2
+   
     for ix_ref, ref in enumerate(stacks[:-1]):
         t = np.zeros(n - ix_ref - 1)
         dvv = np.zeros(n - ix_ref - 1)
         err = np.zeros(n - ix_ref - 1)
         cc1 = np.zeros(n - ix_ref - 1)
-
-
-        if rank > 0:
-            dset.dataset[2] = CCData(stacks, timestamps, fs)
-            dset.dataset[2].lag = lag2
-
-        else:
-            pass
 
         for ixcnt, ix in enumerate(range(ix_ref + 1 + rank, n, size)):
             print(twin)
@@ -75,8 +68,7 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
                 best_ccoeffp, dvv_errorp, = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
                                                  ref=ref, ngrid=conf["ngrid"], stacklevel=2,
                                                  method=conf["measurement_type"], indices=[ix],
-                                                 dvv_bound=conf["maxdvv"], twin0=twin[0], twin1=twin[1]
-                                                 )
+                                                 dvv_bound=conf["maxdvv"])                                                 )
             # print(ix_ref, ix, dvvp)
             t[rank + size * ixcnt] = dvv_timestp[0]
             dvv[rank + size * ixcnt] = dvvp[0]

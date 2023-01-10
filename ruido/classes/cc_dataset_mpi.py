@@ -765,7 +765,7 @@ run measure_dvv_ser on one process.")
         para = {}
         para["dt"] = 1. / fs
         if twin0 is None and twin1 is None:
-            para["twin"] = [lag[0], lag[-1] + 1. / fs]
+            para["twin"] = [lag[0], lag[-1]]
         elif twin0 is None:
             para["twin"] = [lag[0], twin1]
         else:

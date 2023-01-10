@@ -154,4 +154,4 @@ def run_measure(config, rank, size, comm):
                         output.to_csv(os.path.join(config["msr_dir"], outfile_name))
                         print("Done with {}".format(ch_id))
                     else:
-                        print("Ciao!")
+                        pass
