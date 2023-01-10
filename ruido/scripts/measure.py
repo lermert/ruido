@@ -90,11 +90,15 @@ def run_measure(config, rank, size, comm):
                         # define the time windows:
                         # time offset
                         offset_t = dist / config["wave_velocity_mps"]
+                        # here, we fix the offset to the nearest sample. If not, it's a mess to window the data
+                        print(offset_t)
+                        offset_t = dset.dataset[0].lag[np.argmin(np.abs(dset.dataset[0].lag - offset_t))]
+                        print(offset_t)
+
                         # time window half-width
                         longest_T = 1. / min(freq_band)
                         # shift window to coda
                         offset_ts = [offset_t + wd * longest_T for wd in config["window_delays_in_multiples_of_longest_period"]]
-
                         win_hw = [hwmlt * longest_T for hwmlt in config["window_half_widths_in_multiples_of_longest_period"]]
                         # time windows
                         twins = []

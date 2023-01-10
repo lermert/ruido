@@ -28,7 +28,7 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
         timestamps = dset.dataset[1].timestamps[good_windows]
         fs = dset.dataset[1].fs
         lag2 = dset.dataset[1].lag.copy()
-        n = len(dset.dataset[2].timestamps)
+        n = len(stacks)
     else:
         n = 0
         stacks = None
@@ -68,7 +68,7 @@ def measurement_brenguier(dset, conf, twin, freq_band, rank, comm):
                 best_ccoeffp, dvv_errorp, = dset.measure_dvv_ser(f0=freq_band[0], f1=freq_band[1],
                                                  ref=ref, ngrid=conf["ngrid"], stacklevel=2,
                                                  method=conf["measurement_type"], indices=[ix],
-                                                 dvv_bound=conf["maxdvv"])                                                 )
+                                                 dvv_bound=conf["maxdvv"])
             # print(ix_ref, ix, dvvp)
             t[rank + size * ixcnt] = dvv_timestp[0]
             dvv[rank + size * ixcnt] = dvvp[0]
