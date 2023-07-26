@@ -630,7 +630,14 @@ class CCDataset_serial(object):
                 timestamps[i - ix_corr_min] = tstamp
             else:
                 try:
-                    tstmp = '{},{},{},{},{}'.format(*tstamp.split('.')[0: 5])
+                    #print(str(tstamp), type(str(tstamp)))
+                    #print(str(tstamp).split(".")[0:5])
+                    #tstmp = b",".join([tstt for tstt in tstamp.split(b".")[0: 5]])
+                    ttstmp = str(tstamp).split(".")
+                    tstmp = "{},{},{},{},{}".format(*ttstmp[0: 5])
+                    print(tstmp)
+                    print(type(tstmp.encode()), type(b"2021,032,00,00,00"))
+                    print(tstmp.encode("utf-8") == b'2021,032,00,00,00')
                     timestamps[i - ix_corr_min] = UTCDateTime(tstmp).timestamp
                 except KeyError:
                     # leave timestamp as 0, will get dropped
@@ -712,12 +719,12 @@ class CCDataset_serial(object):
         self.dataset[stacklevel_out].ntraces = self.dataset[stacklevel_out].data.shape[0]
         self.dataset[stacklevel_out].npts = self.dataset[stacklevel_out].data.shape[1]
 
-    def plot_stacks(self, stacklevel=1, outfile=None, seconds_to_show=20, scale_factor_plotting=0.1,
-                    plot_mode="heatmap", seconds_to_start=0.0, cmap=plt.cm.bone,
+    def plot_stacks(self, stacklevel=1, outfile=None, seconds_to_show=20, scale_factor_plotting=None,
+                    plot_mode="heatmap", seconds_to_start=0.0, cmap=plt.cm.bone, absolute_v=None,
                     mask_gaps=False, step=None, figsize=None,
                     color_by_cc=False, normalize_all=False, label_style="month",
                     ax=None, plot_envelope=False, ref=None, color_by_clusterlabel=False,
-                    mark_17_quake=False, grid=True, marklags=[], colorful_traces=False):
+                    mark_17_quake=False, grid=True, marklags=[], colorful_traces=False, utcoffset=0.0):
         if mask_gaps and step == None:
             raise ValueError("To mask the gaps, you must provide the step between successive windows.")
 
@@ -767,6 +774,11 @@ class CCDataset_serial(object):
                                  'k', alpha=0.5, linewidth=0.5)
 
                 t = t_to_plot[i]
+                if label_style == "hour":
+                    if UTCDateTime(t).strftime("%m.%d-%I%p") not in months:
+                        ylabels.append(scale_factor_plotting * cnt)
+                        ylabelticks.append(UTCDateTime(t + utcoffset).strftime("%I%p"))
+                        months.append(UTCDateTime(t).strftime("%m.%d-%I%p"))
                 if label_style == "month":
                     if UTCDateTime(t).strftime("%Y%m") not in months:
                         ylabels.append(scale_factor_plotting * cnt)
@@ -796,6 +808,7 @@ class CCDataset_serial(object):
 
             if not mask_gaps:
                 dat_mat = np.zeros((self.dataset[stacklevel].ntraces, self.dataset[stacklevel].npts))
+                cluster_labels_plotting = np.ones(dat_mat.shape[0], dtype=int) * -1
                 for ix, tr in enumerate(to_plot):
                     if normalize_all:
                         dat_mat[ix, :] = tr / tr.max()
@@ -804,6 +817,11 @@ class CCDataset_serial(object):
                     if plot_envelope:
                         dat_mat[ix, :] = envelope(dat_mat[ix, :])
                     t = t_to_plot[ix]
+                    if label_style == "hour":
+                        if UTCDateTime(t).strftime("%m.%d-%I%p") not in months:
+                            ylabels.append(t)
+                            ylabelticks.append(UTCDateTime(t + utcoffset).strftime("%I%p"))
+                            months.append(UTCDateTime(t).strftime("%m.%d-%I%p"))
                     if label_style == "month":
                         if UTCDateTime(t).strftime("%Y%m") not in months:
                             ylabels.append(t)
@@ -824,11 +842,19 @@ class CCDataset_serial(object):
 
                         
                 if plot_envelope:
-                    vmin = 0
-                    vmax = scale_factor_plotting * dat_mat.max()
+                    if scale_factor_plotting is not None:
+                        vmin = 0
+                        vmax = scale_factor_plotting * dat_mat.max()
+                    else:
+                        vmin = 0
+                        vmax = absolute_v
                 else:
-                    vmin = -scale_factor_plotting * dat_mat.max()
-                    vmax = scale_factor_plotting * dat_mat.max() 
+                    if scale_factor_plotting is not None:
+                        vmin = -scale_factor_plotting * dat_mat.max()
+                        vmax = scale_factor_plotting * dat_mat.max()
+                    else:
+                        vmin = -absolute_v
+                        vmax = absolute_v
 
             else:
                 tstamp0 = t_to_plot[0]
@@ -836,18 +862,24 @@ class CCDataset_serial(object):
                 t_to_plot_all = np.arange(tstamp0, tstamp1 + step, step=step)
                 dat_mat = np.zeros((len(t_to_plot_all), self.dataset[stacklevel].npts))
                 dat_mat[:, :] = np.nan
-                cluster_labels_plotting = np.ones(len(t_to_plot_all), dtype=np.int) * -1
+                cluster_labels_plotting = np.ones(dat_mat.shape[0], dtype=int) * -1
         
                 for ix, tr in enumerate(to_plot):
                     t = t_to_plot[ix]
                     ix_t = np.argmin(np.abs(t_to_plot_all - t))
-                    cluster_labels_plotting[ix_t] = self.dataset[stacklevel].cluster_labels[ix]
+                    if color_by_clusterlabel:
+                        cluster_labels_plotting[ix_t] = self.dataset[stacklevel].cluster_labels[ix]
                     if normalize_all:
                         dat_mat[ix_t, :] = tr / tr.max()
                     else:
                         dat_mat[ix_t, :] = tr
                     if plot_envelope:
                         dat_mat[ix_t, :] = envelope(dat_mat[ix_t, :])
+                    if label_style == "hour":
+                        if UTCDateTime(t).strftime("%m.%d-%I%p") not in months:
+                            ylabels.append(t_to_plot_all[ix_t])
+                            ylabelticks.append(UTCDateTime(t + utcoffset).strftime("%I%p"))
+                            months.append(UTCDateTime(t).strftime("%m.%d-%I%p"))
                     if label_style == "month":
                         if UTCDateTime(t).strftime("%Y%m") not in months:
                             ylabels.append(t_to_plot_all[ix_t])
@@ -866,18 +898,26 @@ class CCDataset_serial(object):
                             jdays.append(UTCDateTime(t).strftime("%Y%j"))
                 if plot_envelope:
                     vmin = 0
-                    vmax = scale_factor_plotting * np.nanmax(dat_mat)
+                    if scale_factor_plotting is not None:
+                        vmax = scale_factor_plotting * np.nanmax(dat_mat)
+                    else:
+                        vmax = absolute_v
+
                 else:
-                    vmin = -scale_factor_plotting * np.nanmax(dat_mat)
-                    vmax = scale_factor_plotting * np.nanmax(dat_mat)
+                    if scale_factor_plotting is not None:
+                        vmin = -scale_factor_plotting * np.nanmax(dat_mat)
+                        vmax = scale_factor_plotting * np.nanmax(dat_mat)
+                    else:
+                        vmin = -absolute_v
+                        vmax = absolute_v
                 t_to_plot = t_to_plot_all
             
            
             ax1.pcolormesh(lag, t_to_plot, dat_mat, vmax=vmax, vmin=vmin,
                             cmap=cmap)
             if color_by_clusterlabel:
-                ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_start, t_to_plot, c=cluster_labels_plotting, marker=".", cmap=plt.cm.rainbow)
-                ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_show, t_to_plot, c=cluster_labels_plotting, marker=".", cmap=plt.cm.rainbow)
+                ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_start, t_to_plot, c=cluster_labels_plotting, marker=",", cmap=plt.cm.rainbow)
+                ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_show, t_to_plot, c=cluster_labels_plotting, marker=",", cmap=plt.cm.rainbow)
                 
 
         if mark_17_quake:
