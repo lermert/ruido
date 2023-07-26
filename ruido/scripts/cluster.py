@@ -44,12 +44,12 @@ def run_clustering(config, rank, size, comm):
         # find input files by glob
         if config["print_debug"]:
             print("Rank {} looking for {}".format(rank, os.path.join(config["input_directories"],
-                                      "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
+                                      "*.{}.*.{}--*.{}.*.{}.*.h5".format(station1,
                                                               ch1,
                                                               station2,
                                                               ch2))))
         datafiles = glob(os.path.join(config["input_directories"],
-                                      "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
+                                      "*.{}.*.{}--*.{}.*.{}.*.h5".format(station1,
                                                               ch1,
                                                               station2,
                                                               ch2)))
@@ -281,7 +281,7 @@ def run_clustering_byfile(config, rank, size, comm):
         channel_id = "{}.{}-{}.{}".format(station1, ch1, station2, ch2)
 
         datafiles = glob(os.path.join(config["input_directories"],
-                                      "*.{}.*.{}--*.{}.*.{}.*windows.h5".format(station1,
+                                      "*.{}.*.{}--*.{}.*.{}.*.h5".format(station1,
                                                               ch1,
                                                               station2,
                                                               ch2)))
