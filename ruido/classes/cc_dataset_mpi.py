@@ -941,7 +941,7 @@ run measure_dvv_ser on one process.")
             fs = None
             nrest = None
             td_taper = None
-            npts_smooth = None
+            n_smooth = None
             f1 = None; f2 = None
         fs = comm.bcast(fs, root=0)
         nshare = comm.bcast(nshare, root=0)

@@ -716,8 +716,8 @@ class CCDataset_serial(object):
                     plot_mode="heatmap", seconds_to_start=0.0, cmap=plt.cm.bone,
                     mask_gaps=False, step=None, figsize=None,
                     color_by_cc=False, normalize_all=False, label_style="month",
-                    ax=None, plot_envelope=False, ref=None, color_by_clusterlabel=False,
-                    mark_17_quake=False, grid=True, marklags=[], colorful_traces=False):
+                    ax=None, plot_envelope=False, ref=None, color_by_clusterlabel=False, each_n_labels=1,
+                    mark_events=[], grid=True, marklags=[], colorful_traces=False):
         if mask_gaps and step == None:
             raise ValueError("To mask the gaps, you must provide the step between successive windows.")
 
@@ -836,12 +836,14 @@ class CCDataset_serial(object):
                 t_to_plot_all = np.arange(tstamp0, tstamp1 + step, step=step)
                 dat_mat = np.zeros((len(t_to_plot_all), self.dataset[stacklevel].npts))
                 dat_mat[:, :] = np.nan
-                cluster_labels_plotting = np.ones(len(t_to_plot_all), dtype=np.int) * -1
+                if color_by_clusterlabel:
+                    cluster_labels_plotting = np.ones(len(t_to_plot_all), dtype=np.int) * -1
         
                 for ix, tr in enumerate(to_plot):
                     t = t_to_plot[ix]
                     ix_t = np.argmin(np.abs(t_to_plot_all - t))
-                    cluster_labels_plotting[ix_t] = self.dataset[stacklevel].cluster_labels[ix]
+                    if color_by_clusterlabel:
+                        cluster_labels_plotting[ix_t] = self.dataset[stacklevel].cluster_labels[ix]
                     if normalize_all:
                         dat_mat[ix_t, :] = tr / tr.max()
                     else:
@@ -876,13 +878,15 @@ class CCDataset_serial(object):
             ax1.pcolormesh(lag, t_to_plot, dat_mat, vmax=vmax, vmin=vmin,
                             cmap=cmap)
             if color_by_clusterlabel:
-                ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_start, t_to_plot, c=cluster_labels_plotting, marker=".", cmap=plt.cm.rainbow)
+                ax1.scatter(np.ones(len(t_to_plot))[::each_n_labels] * 0.95 * seconds_to_start, t_to_plot[::each_n_labels], c=cluster_labels_plotting[::each_n_labels], marker=".", cmap=plt.cm.rainbow)
                 ax1.scatter(np.ones(len(t_to_plot)) * 0.95 * seconds_to_show, t_to_plot, c=cluster_labels_plotting, marker=".", cmap=plt.cm.rainbow)
                 
 
-        if mark_17_quake:
-            ylabels.append(UTCDateTime("2017,262").timestamp)
-            ylabelticks.append("EQ Puebla")
+        #if mark_17_quake:
+        #    ylabels.append(UTCDateTime("2017,262").timestamp)
+        #    ylabelticks.append("EQ Puebla")
+        for m_ev in mark_events:
+            ax1.hlines(xmin=seconds_to_start, xmax=seconds_to_show, y=UTCDateTime(m_ev).timestamp, linestyles="--", color="c")
 
         ax1.set_title(self.station_pair)
         if normalize_all:

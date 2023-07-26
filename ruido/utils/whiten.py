@@ -30,17 +30,16 @@ def moving_ave(A, N):
 
 
 def whiten(timeseries, sampling_rate, freqmin, freqmax,
-           n_smooth=1, n_taper=100, n_taper_min=20):
-
+           n_smooth=1, n_taper=50, n_taper_min=5):
+    
     dt = 1. / sampling_rate
     nfft = next_fast_len(2 * len(timeseries))
     spec = np.fft.rfft(timeseries, nfft)
     freq = np.fft.rfftfreq(nfft, d=dt)
-
     ix0 = np.argmin(np.abs(freq - freqmin))
     ix1 = np.argmin(np.abs(freq - freqmax))
-
-    if ix1 + n_taper > nfft:
+    
+    if ix1 + n_taper >= nfft:
         if nfft - ix1 >= n_taper_min:
             ix11 = nfft
         else:
@@ -50,7 +49,7 @@ def whiten(timeseries, sampling_rate, freqmin, freqmax,
 
 
     if ix0 - n_taper < 0:
-        if ix1 >= n_taper_min:
+        if ix0 >= n_taper_min:
             ix00 = 0
         else:
             raise ValueError("Not enough space to taper, choose a higher freq_min")
@@ -67,12 +66,13 @@ def whiten(timeseries, sampling_rate, freqmin, freqmax,
     else:
         spec_out[ix00: ix11] /= moving_ave(np.abs(spec_out[ix00: ix11]), n_smooth)
 
-
     x = np.linspace(np.pi / 2., np.pi, ix0 - ix00)
-    spec_out[ix00: ix0] *= np.cos(x) ** 2
+    spec_out[ix00: ix0] *= (np.cos(x) ** 2)
+
 
     x = np.linspace(0., np.pi / 2., ix11 - ix1)
-    spec_out[ix1: ix11] *= np.cos(x) ** 2
+    # print(np.cos(x).shape, ix1, ix11)
+    spec_out[ix1: ix11] *= (np.cos(x) ** 2)
 
     return(spec_out, nfft)
 

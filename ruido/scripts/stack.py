@@ -138,11 +138,11 @@ def run_stacking(config, rank, size, comm):
                             if i == 0:
                                 network = os.path.basename(f).split(".")[0]
                                 dset.data_to_memory()
+                                print(dset)
                                 if rank == 0 and config["use_clusters"]:
                                     dset.dataset[0].add_cluster_labels(clusters)
                                 else:
                                     pass
-                                print("here")
                             else:
                                 dset.add_datafile(f)
                                 dset.data_to_memory(keep_duration=config["duration"])
@@ -156,14 +156,10 @@ def run_stacking(config, rank, size, comm):
                                     fnorm = "rma"
                                 else:
                                     fnorm = "phase_only"
-                                dset.post_whiten(f1=freq_band[0] * 0.75,
-                                                 f2=freq_band[1] * 1.5, stacklevel=0,
+                                dset.post_whiten(f1=freq_band[0],
+                                                 f2=freq_band[1], stacklevel=0,
                                                  npts_smooth=config["whiten_nsmooth"],
                                                  freq_norm=fnorm)
-                            dset.filter_data(f_hp=freq_band[0], f_lp=freq_band[1], taper_perc=0.2,
-                                             filter_type=config["filt_type"], stacklevel=0,
-                                             maxorder=config["filt_maxord"])
-                            print("Filtering done")
                             if rank == 0:
                                 # try:
                                 #     t_running = dset.dataset[1].timestamps.max() + config["step"]

@@ -135,7 +135,7 @@ def cwt_bandpass(data, freqmin, freqmax, df, dj=1 / 12,
     return np.real(pycwt.icwt(cwt[ix_freq], scales[ix_freq], dt, dj, mother_wavelet))
 
 
-def bandpass(freqmin, freqmax, df, corners=4):
+def bandpass(freqmin, freqmax, df, corners=1):
     """
     Butterworth-Bandpass Filter.
 

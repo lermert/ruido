@@ -157,6 +157,7 @@ def run_clustering(config, rank, size, comm):
             elif config["scaling_type"] == "simple":
                 X = dset.dataset[2].data
                 for xx in X:
+                    if np.abs(xx).max() == 0.0: continue
                     xx -= xx.mean()
                     xx /= np.abs(xx).max()
 
@@ -202,8 +203,11 @@ def run_clustering(config, rank, size, comm):
                     X = dset.dataset[0].data
                     for tr in X:
                         tr -= tr.mean()
-                        tr /= np.abs(tr).max()
-                    print(X.max())
+                        if np.abs(tr).max() != 0.0:
+                            tr /= np.abs(tr).max()
+                        else:
+                            print("Trace with zero max. found, sum trace: ", tr.sum())
+                    print("Max of array for clustering ", X.max())
 
                 pca_output = pca_rand.transform(X)
                 # append to the list
